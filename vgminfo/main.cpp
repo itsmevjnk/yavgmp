@@ -7,7 +7,7 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
-	vgm_parser vgm(argv[argc - 1]); // open file
+	vgm_parser vgm(argv[argc - 1], false); // open file
 	if(vgm.is_data_fully_cached()) printf("NOTE: File contents have been read to parser object in advance.\n\n");
 	else printf("NOTE: File contents were not read in advance.\n\n");
 
@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
 
 	printf("OKIM6295 clock        : %u Hz\n", VGM_CLOCK(vgm.header.fields.ok95_clock));
 
-	printf("SCC clock             : %u Hz\n", VGM_CLOCK(vgm.header.fields.dmg_clock));
+	printf("SCC clock             : %u Hz\n", VGM_CLOCK(vgm.header.fields.scc_clock));
 	printf("HuC6280 clock         : %u Hz\n", VGM_CLOCK(vgm.header.fields.hu_clock));
 	printf("K053260 clock         : %u Hz\n", VGM_CLOCK(vgm.header.fields.k60_clock));
 	printf("Pokey clock           : %u Hz\n", VGM_CLOCK(vgm.header.fields.pokey_clock));
@@ -97,11 +97,22 @@ int main(int argc, char* argv[]) {
 	printf("GA20 clock            : %u Hz\n", VGM_CLOCK(vgm.header.fields.ga20_clock));
 	printf("Mikey clock           : %u Hz\n\n", VGM_CLOCK(vgm.header.fields.mikey_clock));
 
+	printf("Data stream dump : \n");
+	vgm.cmd_log = stdout;
+	while(vgm.parse_next() && vgm.played_loops == 0);
+	putchar('\n');
+
+	if(!vgm.is_gd3_parsed()) {
+		/* read the rest of the file and parse GD3 tag */
+		vgm.populate_cache();
+		vgm.parse_gd3();
+	}
+
 	printf("GD3 tag : ");
 	if(!vgm.header.fields.gd3_offset) printf("N/A\n\n");
 	else {
 		printf("available @ 0x%x", vgm.header.fields.gd3_offset);
-		if(!vgm.gd3_tag) printf(", not parsed due to unseekable stream\n\n");
+		if(!vgm.is_gd3_parsed()) printf(", not parsed due to unseekable stream\n\n");
 		else {
 			printf(" : \n\n");
 

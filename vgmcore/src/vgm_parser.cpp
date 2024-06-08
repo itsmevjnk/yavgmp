@@ -29,17 +29,20 @@ void vgm_parser::init_stub(bool read_all) {
         delete _stream; _stream = nullptr; // we're done with the stream
 
         header.init(_file_buf, file_len);
+        if(header.fields.gd3_offset) _gd3 = new gd3(&_file_buf[header.fields.gd3_offset], header.fields.eof_offset - header.fields.gd3_offset);
 
-        _data_buf = &_file_buf[header.fields.data_offset]; _data_buf_cached_bytes = header.get_data_len(); // we've effectively cached the entire data stream
+        /* we've effectively cached the entire data stream */
+        _data_buf = &_file_buf[header.fields.data_offset];
+        _data_buf_cached_bytes = header.get_data_len();
     } else {
         /* initialise straight from stream */
         header.init(*_stream);
 
         /* try to seek to beginning of data and see if we can actually seek with this stream */
         _stream->seekg(header.fields.data_offset, _stream->beg);
-        bool seekable = _stream->tellg() == header.fields.data_offset;
+        _stream_seekable = _stream->tellg() == header.fields.data_offset;
 
-        if(seekable) {
+        if(_stream_seekable) {
             /* we can seek, so we can get the GD3 tag read */
             if(header.fields.gd3_offset) {
                 _stream->seekg(header.fields.gd3_offset, _stream->beg);
@@ -50,11 +53,12 @@ void vgm_parser::init_stub(bool read_all) {
             }
         } else {
             /* we can't seek :( so no GD3; but we still have to fast forward to our data anyway */
+            _stream->clear(); // clear fail bit that might have been set
             for(int i = 0; i < header.fields.data_offset - header.length; i++) _stream->get();
-        }
 
-        _data_buf = (uint8_t*)malloc(header.get_data_len()); // allocate space for caching data stream
-        if(!_data_buf) throw std::runtime_error("cannot allocate data stream cache");
+            _data_buf = (uint8_t*)malloc(header.get_data_len()); // allocate space for caching data stream
+            if(!_data_buf) throw std::runtime_error("cannot allocate data stream cache");
+        }
     }
 }
 
@@ -99,14 +103,15 @@ vgm_parser::~vgm_parser() {
     else if(_data_buf) free((void*)_data_buf); // _data_buf is a separate buffer if _file_buf = nullptr
 }
 
-bool vgm_parser::is_data_fully_cached() const {
-    return (_file_buf || (_data_buf_cached_samples == header.fields.total_samples && _data_buf[_data_buf_cached_bytes - 1] == 0x66));
-    /*
-     * we can consider the data to be fully cached if either
-     * _file_buf is not null (meaning we've read everything
-     * when we initialised), or we've cached (played) the
-     * exact number of samples as the file has and the last
-     * byte in our cache is data stream termination command
-     * (0x66)
-     */
+bool vgm_parser::is_gd3_parsed() const {
+    return (_gd3);
+}
+
+bool vgm_parser::parse_gd3() {
+    if(_gd3) return true; // GD3 tag has already been parsed - skip
+    if(!header.fields.gd3_offset) return false; // no GD3 tags for parsing
+
+    populate_cache(); // read the rest of the file into cache
+    _gd3 = new gd3(&_data_buf[header.fields.gd3_offset - header.fields.data_offset], header.fields.eof_offset - header.fields.gd3_offset);
+    return true;
 }
