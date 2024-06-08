@@ -1,0 +1,3 @@
+[submodule "vgmcore/zstr"]
+	path = vgmcore/zstr
+	url = https://github.com/mateidavid/zstr

@@ -1,5 +1,5 @@
 #include <fstream>
-#include <vgm_file.h>
+#include <vgm_parser.h>
 
 int main(int argc, char* argv[]) {
 	if(argc != 2) {
@@ -7,8 +7,11 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
-	vgm_file vgm(argv[argc - 1]); // open file
-	printf("%s : %s VGM file (%u bytes uncompressed)\n\n", argv[argc - 1], (vgm.compressed) ? "compressed" : "uncompressed", vgm.header.fields.eof_offset);
+	vgm_parser vgm(argv[argc - 1]); // open file
+	if(vgm.is_data_fully_cached()) printf("NOTE: File contents have been read to parser object in advance.\n\n");
+	else printf("NOTE: File contents were not read in advance.\n\n");
+
+	printf("%s : %u bytes uncompressed\n\n", argv[argc - 1], vgm.header.fields.eof_offset);
 
 	printf("Version               : %u.%02u\n", vgm.header.fields.version_maj, vgm.header.fields.version_min);
 	std::pair<int, float> total_dur = vgm.header.get_total_duration();
@@ -92,7 +95,25 @@ int main(int argc, char* argv[]) {
 
 	printf("X1-010 clock          : %u Hz\n", VGM_CLOCK(vgm.header.fields.x1_clock));
 	printf("GA20 clock            : %u Hz\n", VGM_CLOCK(vgm.header.fields.ga20_clock));
-	printf("Mikey clock           : %u Hz\n", VGM_CLOCK(vgm.header.fields.mikey_clock));
+	printf("Mikey clock           : %u Hz\n\n", VGM_CLOCK(vgm.header.fields.mikey_clock));
+
+	printf("GD3 tag : ");
+	if(!vgm.header.fields.gd3_offset) printf("N/A\n\n");
+	else {
+		printf("available @ 0x%x", vgm.header.fields.gd3_offset);
+		if(!vgm.gd3_tag) printf(", not parsed due to unseekable stream\n\n");
+		else {
+			printf(" : \n\n");
+
+			printf("Track name            : %s (%s)\n", vgm.gd3_tag->title.c_str(), vgm.gd3_tag->original_title.c_str());
+			printf("Game title            : %s (%s)\n", vgm.gd3_tag->game.c_str(), vgm.gd3_tag->original_game.c_str());
+			printf("System name           : %s (%s)\n", vgm.gd3_tag->system.c_str(), vgm.gd3_tag->original_system.c_str());
+			printf("Original author       : %s (%s)\n", vgm.gd3_tag->author.c_str(), vgm.gd3_tag->original_author.c_str());
+			printf("Release date          : %s\n", vgm.gd3_tag->date.c_str());
+			printf("Converted by          : %s\n", vgm.gd3_tag->convert_author.c_str());
+			printf("Notes                 : %s\n\n", vgm.gd3_tag->notes.c_str());
+		}
+	}
 
 	return 0;
 }

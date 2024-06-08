@@ -20,7 +20,13 @@ void vgm_header::init_stub(F&& read_cb, size_t maxlen) {
 	memset(&_header, 0, sizeof(_header)); // clear header buffer
 	read_cb((uint8_t*)&_header, 0, 0x40); // copy first 64 bytes of the header (which must exist no matter what)
 
-	if(memcmp(&_header.ident, "Vgm ", 4)) throw std::invalid_argument("buf contains invalid ident");
+	// if(memcmp(&_header.ident, "Vgm ", 4))
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	if(*((uint32_t*)&_header.ident) != 0x56676D20)
+#else
+	if(*((uint32_t*)&_header.ident) != 0x206D6756)
+#endif
+		throw std::invalid_argument("invalid ident");
 
 	_header.version_maj = BCD_TO_INT(_header.version_maj); _header.version_min = BCD_TO_INT(_header.version_min); // convert version header from BCD to integer
 
@@ -73,12 +79,14 @@ void vgm_header::init_stub(F&& read_cb, size_t maxlen) {
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 		_header.data_offset = ENDIAN_FLIP_32(_header.data_offset);
 #endif
+		_header.data_offset = RELOFF_TO_ABSOFF(_header, _header.data_offset);
 		if(maxlen > 0x40) {
 			/* read the rest of the header */
 			size_t len = sizeof(_header); // offset of end of header
 			if(_header.data_offset < len) len = _header.data_offset;
 			if(maxlen < len) len = maxlen; // TODO: should we throw an exception here?
-			read_cb((uint8_t*)&_header, 0x40, len - 0x40);
+			_header_len = len;
+			read_cb((uint8_t*)((uintptr_t)&_header + 0x40), 0x40, len - 0x40);
 		}
 	}
 
@@ -167,7 +175,7 @@ void vgm_header::init(const uint8_t* buf, size_t size) {
 
 	init_stub(
 		[buf](uint8_t* dest_buf, size_t offset, size_t len) {
-			memcpy(&dest_buf[offset], &buf[offset], len);
+			memcpy(dest_buf, &buf[offset], len);
 		},
 		size
 	);
@@ -183,8 +191,8 @@ void vgm_header::init(std::istream& stream) {
 	size_t current_offset = 0;
 	init_stub(
 		[&stream, &current_offset](uint8_t* dest_buf, size_t offset, size_t len) {
-			if(current_offset != offset) throw std::runtime_error("unexpected non-sequential read"); // the stub is supposed to read sequentially (once for first 64 bytes, then another for the remainder of the header)
-			stream.read((char*)&dest_buf[offset], len);
+			if(current_offset != offset) throw std::runtime_error("unexpected non-sequential read");
+			stream.read((char*)dest_buf, len);
 			if(stream.fail()) throw std::runtime_error("read operation failed");
 			current_offset += len;
 		},
@@ -241,4 +249,8 @@ float vgm_header::get_loop_multiplier() const {
 uint16_t vgm_header::get_c352_clkdiv() const {
 	if(!fields.c352_clock) return 0; // C352 not present
 	return (uint16_t)fields.c352_clkdiv << 2;
+}
+
+size_t vgm_header::get_data_len() const {
+	return fields.eof_offset - fields.data_offset;
 }

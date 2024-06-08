@@ -135,6 +135,7 @@ typedef struct {
 class vgm_header {
 public:
 	const vgm_header_t& fields = _header;
+	const size_t& length = _header_len;
 
 	void init(const uint8_t* buf, size_t size);
     void init(std::istream& stream);
@@ -154,8 +155,11 @@ public:
 	float get_loop_multiplier() const;
 
 	uint16_t get_c352_clkdiv() const;
+
+	size_t get_data_len() const;
 private:
 	vgm_header_t _header;
+	size_t _header_len = 0x40;
     
 	template<typename F> void init_stub(F&& read_cb, size_t maxlen);
     

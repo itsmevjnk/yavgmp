@@ -7,11 +7,11 @@ project(
 
 add_library(
     vgmcore SHARED
-    src/vgm.cpp src/vgm_file.cpp src/vgm_header.cpp
-    include/vgm.h include/vgm_file.h include/vgm_header.h
+    src/vgm_parser.cpp src/vgm_header.cpp src/gd3.cpp
+    include/vgm_parser.h include/vgm_header.h include/gd3.h
 )
 
 target_include_directories(vgmcore PUBLIC include)
 
-find_package(ZLIB REQUIRED)
-target_link_libraries(vgmcore ZLIB::ZLIB)
+add_subdirectory(zstr)
+target_link_libraries(vgmcore PRIVATE zstr::zstr)
