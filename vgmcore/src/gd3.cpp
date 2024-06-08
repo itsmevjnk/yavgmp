@@ -35,9 +35,17 @@ template<typename F> void gd3::init_stub(F&& read_cb, size_t maxlen) {
 		throw std::invalid_argument("invalid ident");
     
     read_cb(temp, 4, 4); _ver_min = temp[0]; _ver_maj = temp[1]; // read version
+    
+    /* read data length field */
+    uint32_t len; read_cb((uint8_t*)&len, 8, 4);
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    len = ((len & 0xFF000000) >> 24) | ((len & 0x00FF0000) >> 8) | ((len & 0x0000FF00) << 8) | ((len & 0x000000FF) << 24);
+#endif
+    len += 12;
+    if(len < maxlen) maxlen = len;
 
     /* read string fields */
-    size_t offset = 8;
+    size_t offset = 12;
     offset = read_utf16le_string(read_cb, offset, maxlen, _title);
     offset = read_utf16le_string(read_cb, offset, maxlen, _title_orig);
     offset = read_utf16le_string(read_cb, offset, maxlen, _game);
