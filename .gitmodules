@@ -1,3 +1,6 @@
 [submodule "vgmcore/zstr"]
 	path = vgmcore/zstr
 	url = https://github.com/mateidavid/zstr
+[submodule "vgmchips/psg/emu76489"]
+	path = vgmchips/psg/emu76489
+	url = https://github.com/digital-sound-antiques/emu76489.git

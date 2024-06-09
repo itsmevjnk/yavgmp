@@ -139,7 +139,17 @@ void vgm_parser::do_wait(uint8_t cmd) {
             break;
     }
     if(cmd_log) fprintf(cmd_log, "\t\twait %u samples\n", n);
-    // TODO
+
+    for(size_t samp = 0; samp < n; samp++, _track_pos++, _played_samples++) {
+        /* iterate through our list of chips to invoke next_sample() */
+        for(size_t i = 0; i < sizeof(chips) / sizeof(chips_array[0]); i++) {
+            if(chips_array[i]) chips_array[i]->next_sample();
+        }
+
+        if(on_new_sample) {
+            if(!on_new_sample(this)) return; // stop processing
+        }
+    }
 } // 0x61/62/63/7n
 
 void vgm_parser::do_end(uint8_t cmd) {

@@ -101,6 +101,11 @@ vgm_parser::vgm_parser(const char* path, bool decompress_all) {
 vgm_parser::~vgm_parser() {
     if(_file_buf) free((void*)_file_buf);
     else if(_data_buf) free((void*)_data_buf); // _data_buf is a separate buffer if _file_buf = nullptr
+    if(_gd3) delete _gd3;
+
+    for(size_t i = 0; i < sizeof(chips) / sizeof(chips_array[0]); i++) {
+        if(chips_array[i]) delete chips_array[i]; // delete our chip emulators too
+    }
 }
 
 bool vgm_parser::is_gd3_parsed() const {

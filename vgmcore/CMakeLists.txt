@@ -15,3 +15,7 @@ target_include_directories(vgmcore PUBLIC include)
 
 add_subdirectory(zstr)
 target_link_libraries(vgmcore PRIVATE zstr::zstr)
+
+add_subdirectory(../vgmchips ../vgmchips)
+target_link_libraries(vgmcore PUBLIC psg_native)
+target_link_libraries(vgmcore PUBLIC psg_wrapper)

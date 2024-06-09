@@ -29,6 +29,8 @@ public:
 
     void populate_cache();
 
+    bool (*on_new_sample)(vgm_parser* parser) = nullptr; // callback for when a new sample has been processed
+
     /* chips */
     struct {
         vgm_chip* psg = nullptr;
@@ -74,8 +76,9 @@ public:
         vgm_chip* ga20 = nullptr;
         vgm_chip* mikey = nullptr;
     } chips;
-    const vgm_chip** chips_array = (const vgm_chip**)&chips;
+    vgm_chip* const* const chips_array = (vgm_chip* const* const)&chips;
 
+    const size_t& track_pos = _track_pos;
     const size_t& played_samples = _played_samples;
     const size_t& played_loops = _played_loops;
 

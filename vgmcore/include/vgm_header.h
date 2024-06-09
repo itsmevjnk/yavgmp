@@ -31,6 +31,7 @@ enum ay8910_flag_bits {
 };
 
 #define VGM_CLOCK(x)												((x) & ~((1 << 30) | (1 << 31))) // get the clock frequency from a clock field, minus the variant and dual chip bits
+#define VGM_CLOCK_DUAL												(1 << 30)
 
 #pragma pack(push, 1)
 typedef struct {
