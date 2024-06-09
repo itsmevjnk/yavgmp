@@ -11,6 +11,8 @@
 #include <psg_wrapper.h>
 #endif
 
+#include <opll_wrapper.h>
+
 /* chip names according to their position in vgm_parser::chips */
 const char* chips[] = {
 	"psg",
@@ -110,11 +112,15 @@ int main(int argc, char* argv[]) {
 	}
 
 	vgm_parser vgm(argv[argc - 1], false); // open file
+
+	/* install chip emulators */
 #ifdef PSG_USE_NATIVE
 	psg_native::install(vgm);
 #else
 	psg_wrapper::install(vgm);
 #endif
+	opll_wrapper::install(vgm);
+
 	vgm.on_new_sample = &new_sample_handler; // set sample handler
 
 	int section = 0;

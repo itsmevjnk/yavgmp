@@ -4,3 +4,6 @@
 [submodule "vgmchips/psg/emu76489"]
 	path = vgmchips/psg/emu76489
 	url = https://github.com/digital-sound-antiques/emu76489.git
+[submodule "vgmchips/opll/emu2413"]
+	path = vgmchips/opll/emu2413
+	url = https://github.com/digital-sound-antiques/emu2413

@@ -6,3 +6,4 @@ project(
 )
 
 add_subdirectory(psg)
+add_subdirectory(opll)
