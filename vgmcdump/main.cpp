@@ -4,7 +4,7 @@
 #include <fstream>
 #include <vgm_parser.h>
 
-// #define PSG_USE_NATIVE // uncomment to use native PSG emulator implementation instead of emu76489 wrapper
+#define PSG_USE_NATIVE // uncomment to use native PSG emulator implementation instead of emu76489 wrapper
 #ifdef PSG_USE_NATIVE
 #include <psg_native.h>
 #else

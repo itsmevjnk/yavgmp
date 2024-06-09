@@ -10,10 +10,6 @@
  * 
  * The original library can be found here:
  *   https://github.com/digital-sound-antiques/emu76489
- * 
- * NOTE: According to psgbench results, this seems to yield worse
- *       performance than psg_wrapper - this can probably be due to
- *       the floating-point operations used in this implementation.
  */
 
 #include <psg_native.h>
