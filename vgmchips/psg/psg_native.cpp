@@ -134,8 +134,8 @@ void psg_emu::update_output() {
     _noise_count -= (_noise_fref) ? _freq[2] : _noise_freq;
     bool sign = (_noise_seed & 1) ^ (_neg_output);
 #if defined(PSG_SMOOTH_OUTPUT)
-    if(sign) _channels_out[3] -= voltbl[_noise_volume]; else _channels_out[3] -= voltbl[_noise_volume];
-    _channels_out[3] /= 2;
+    if(sign) _channels_out[3] -= voltbl[_noise_volume]; else _channels_out[3] += voltbl[_noise_volume];
+    _channels_out[3] /= 2.0;
 #else
     _channels_out[3] = (sign) ? -voltbl[_noise_volume] : voltbl[_noise_volume];
 #endif
