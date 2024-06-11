@@ -534,19 +534,19 @@ void vgm_parser::do_ay8910_write(uint8_t cmd) {
 
 void vgm_parser::do_rf68_write(uint8_t cmd) {
     uint8_t mem = ((cmd & 0xF0) == 0xC0) ? 1 : 0;
-    uint16_t addr_reg = (mem) ? read_u16le() : read_u8();
+    uint16_t addr_reg = 0;
     if(mem) {
         addr_reg = read_u16le();
-        if(cmd_log) fprintf(cmd_log, "%02x %02x ", (addr_reg & 0xFF), (addr_reg >> 8));
+        // if(cmd_log) fprintf(cmd_log, "%02x %02x ", (addr_reg & 0xFF), (addr_reg >> 8));
     } else {
         addr_reg = read_u8();
-        if(cmd_log) fprintf(cmd_log, "%02x ", addr_reg);
+        // if(cmd_log) fprintf(cmd_log, "%02x ", addr_reg);
     }
     uint8_t data = read_u8();
 
     if(cmd_log) {
-        if(mem) fprintf(cmd_log, "%02x %02x %02x %02x\tRF5C68\tmem 0x%04x <- 0x%02x", cmd, (addr_reg & 0xFF), (addr_reg >> 8), data, addr_reg, data);
-        else fprintf(cmd_log, "%02x %02x %02x\tRF5C68\treg 0x%02x <- 0x%02x", cmd, addr_reg, data, addr_reg, data);
+        if(mem) fprintf(cmd_log, "%02x %02x %02x %02x\tRF5C68\tmem 0x%04x <- 0x%02x\n", cmd, (addr_reg & 0xFF), (addr_reg >> 8), data, addr_reg, data);
+        else fprintf(cmd_log, "%02x %02x %02x\tRF5C68\treg 0x%02x <- 0x%02x\n", cmd, addr_reg, data, addr_reg, data);
     }
 
     if(chips.rf68) chips.rf68->write(0, mem, addr_reg, data);
@@ -554,19 +554,19 @@ void vgm_parser::do_rf68_write(uint8_t cmd) {
 
 void vgm_parser::do_rf164_write(uint8_t cmd) {
     uint8_t mem = ((cmd & 0xF0) == 0xC0) ? 1 : 0;
-    uint16_t addr_reg = (mem) ? read_u16le() : read_u8();
+    uint16_t addr_reg = 0;
     if(mem) {
         addr_reg = read_u16le();
-        if(cmd_log) fprintf(cmd_log, "%02x %02x ", (addr_reg & 0xFF), (addr_reg >> 8));
+        // if(cmd_log) fprintf(cmd_log, "%02x %02x ", (addr_reg & 0xFF), (addr_reg >> 8));
     } else {
         addr_reg = read_u8();
-        if(cmd_log) fprintf(cmd_log, "%02x ", addr_reg);
+        // if(cmd_log) fprintf(cmd_log, "%02x ", addr_reg);
     }
     uint8_t data = read_u8();
 
     if(cmd_log) {
-        if(mem) fprintf(cmd_log, "%02x %02x %02x %02x\tRF5C164\tmem 0x%04x <- 0x%02x", cmd, (addr_reg & 0xFF), (addr_reg >> 8), data, addr_reg, data);
-        else fprintf(cmd_log, "%02x %02x %02x\tRF5C164\treg 0x%02x <- 0x%02x", cmd, addr_reg, data, addr_reg, data);
+        if(mem) fprintf(cmd_log, "%02x %02x %02x %02x\tRF5C164\tmem 0x%04x <- 0x%02x\n", cmd, (addr_reg & 0xFF), (addr_reg >> 8), data, addr_reg, data);
+        else fprintf(cmd_log, "%02x %02x %02x\tRF5C164\treg 0x%02x <- 0x%02x\n", cmd, addr_reg, data, addr_reg, data);
     }
 
     if(chips.rf164) chips.rf164->write(0, mem, addr_reg, data);
@@ -575,7 +575,7 @@ void vgm_parser::do_rf164_write(uint8_t cmd) {
 void vgm_parser::do_pwm_write(uint8_t cmd) {
     uint16_t addr_data = read_u16be();
     uint16_t addr = addr_data >> 12, data = addr_data & 0x0FFF;
-    if(cmd_log) fprintf(cmd_log, "%02x %02x %02x\tPWM\treg 0x%x <- 0x%03x", cmd, (addr_data >> 8), (addr_data & 0xFF), addr, data);
+    if(cmd_log) fprintf(cmd_log, "%02x %02x %02x\tPWM\treg 0x%x <- 0x%03x\n", cmd, (addr_data >> 8), (addr_data & 0xFF), addr, data);
     if(chips.pwm) chips.pwm->write(0, 0, addr, data);
 } // 0xB2
 
