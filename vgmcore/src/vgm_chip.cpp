@@ -1,6 +1,8 @@
 #include <vgm_chip.h>
 #include <stdio.h>
 
+#include <stdexcept>
+
 vgm_chip::vgm_chip(size_t num_channels) : channels(num_channels) {
     channels_out = _channels_out = new float[num_channels];
     channels_pan = _channels_pan = new pff[num_channels];
@@ -22,4 +24,14 @@ pff vgm_chip::mix_channels() {
         right += _channels_out[i] * _channels_pan[i].second;
     }
     return std::make_pair(left / channels, right / channels);
+}
+
+/* many chips won't have this method implemented, so it's safer to provide a generic implementation that throws an error */
+
+void vgm_chip::write_rom(uintptr_t chip, size_t total_size, uintptr_t base_addr, const uint8_t* data, size_t len, size_t type) {
+    throw std::runtime_error("write_rom implementation not provided");
+}
+
+void vgm_chip::write_ram(uintptr_t chip, uintptr_t base_addr, const uint8_t* data, size_t len) {
+    throw std::runtime_error("write_ram implementation not provided");
 }

@@ -120,6 +120,19 @@ void vgm_parser::do_opl3_write(uint8_t cmd) {
     if(chips.opl3) chips.opl3->write(chip, port, reg, data);
 } // 0x5E/5F
 
+void vgm_parser::wait(size_t n) {
+    for(size_t samp = 0; samp < n; samp++, _track_pos++, _played_samples++) {
+        /* iterate through our list of chips to invoke next_sample() */
+        for(size_t i = 0; i < sizeof(chips) / sizeof(chips_array[0]); i++) {
+            if(chips_array[i]) chips_array[i]->next_sample();
+        }
+
+        if(on_new_sample) {
+            if(!on_new_sample(this)) return; // stop processing
+        }
+    }
+}
+
 void vgm_parser::do_wait(uint8_t cmd) {
     uint16_t n;
     if(cmd_log) fprintf(cmd_log, "%02x", cmd);
@@ -140,16 +153,7 @@ void vgm_parser::do_wait(uint8_t cmd) {
     }
     if(cmd_log) fprintf(cmd_log, "\t\twait %u samples\n", n);
 
-    for(size_t samp = 0; samp < n; samp++, _track_pos++, _played_samples++) {
-        /* iterate through our list of chips to invoke next_sample() */
-        for(size_t i = 0; i < sizeof(chips) / sizeof(chips_array[0]); i++) {
-            if(chips_array[i]) chips_array[i]->next_sample();
-        }
-
-        if(on_new_sample) {
-            if(!on_new_sample(this)) return; // stop processing
-        }
-    }
+    wait(n);
 } // 0x61/62/63/7n
 
 void vgm_parser::do_end(uint8_t cmd) {
@@ -162,18 +166,342 @@ void vgm_parser::do_end(uint8_t cmd) {
     } else _play_ended = true;
 } // 0x66
 
+#define ENDIAN_FLIP_16(x)					((((x) & 0x00FF) << 8) | (((x) & 0xFF00) >> 8))
+#define ENDIAN_FLIP_32(x)					((((x) & 0x000000FF) << 24) | (((x) & 0x0000FF00) << 8) | (((x) & 0x00FF0000) >> 8) | (((x) & 0xFF000000) >> 24))
+
 void vgm_parser::do_data_block(uint8_t cmd) {
-    // TODO
+    uint8_t compat = read_u8(); // 0x66 (we'll ignore this)
+    if(cmd_log) fprintf(cmd_log, "%02x %02x ", cmd, compat);
+    vgm_dblock_t* dblock;
+    if(_stream && _stream_seekable) {
+        /* directly reading from file - we'll alloc our own dblock struct */
+        uint8_t type = read_u8(); // data type
+        uint32_t size = read_u32le(); // data size
+        if(cmd_log) fprintf(cmd_log, "%02x %02x %02x %02x %02x ", type, (size & 0xFF), ((size >> 8) & 0xFF), ((size >> 16) & 0xFF), ((size >> 24) & 0xFF));
+        dblock = (vgm_dblock_t*) malloc(VGM_DBLOCK_HEADER_SIZE + size);
+        dblock->type = type; dblock->size = size;
+        for(int i = 0; i < size; i++) dblock->data.uncompressed[i] = read_u8();
+    } else {
+        /* reading from cache - we'll use that instead */
+        dblock = (vgm_dblock_t*)&_data_buf[_data_pos];
+        for(int i = 0; i < 5; i++) {
+            uint8_t tmp = read_u8();
+            if(cmd_log) fprintf(cmd_log, "%02x ", tmp);
+        } // get the type and data size saved into our block
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+        dblock->size = ENDIAN_FLIP_32(dblock->size);
+#endif
+        for(int i = 0; i < dblock->size; i++) read_u8(); // read data
+    }
+    if(cmd_log) fprintf(cmd_log, "...\t\tdata block: type 0x%02x, %u bytes: ", dblock->type, dblock->size);
+
+    bool logged = false; // for 0x40-47 -> 0x00-07
+    switch(dblock->type) {
+        case 0x7F:
+            /* decompression table - save them for future consumption */
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+            dblock->data.decomp_table.values = ENDIAN_FLIP_16(dblock->data.decomp_table.values);
+#endif
+            if(cmd_log) fprintf(cmd_log, "decompression table\n%02x %02x %02x %02x %02x %02x\t\t type:subtype 0x%02x:0x%02x, %u decompressed bits -> %u compressed bits, %u values\n", dblock->data.decomp_table.type, dblock->data.decomp_table.subtype, dblock->data.decomp_table.bd, dblock->data.decomp_table.bc, (dblock->data.decomp_table.values & 0xFF), (dblock->data.decomp_table.values >> 8), dblock->data.decomp_table.type, dblock->data.decomp_table.subtype, dblock->data.decomp_table.bd, dblock->data.decomp_table.bc, dblock->data.decomp_table.values);
+            _decomp_tables.push_back(dblock);
+            break;
+        case 0x40:
+        case 0x41:
+        case 0x42:
+        case 0x43:
+        case 0x44:
+        case 0x45:
+        case 0x46:
+        case 0x47:
+            /* compressed PCM data - decompress them first, then we can handle using the below code */
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+            dblock->data.compressed.uncomp_size = ENDIAN_FLIP_32(dblock->data.compressed.uncomp_size);
+            dblock->data.compressed.off = ENDIAN_FLIP_16(dblock->data.compressed.off);
+#endif
+            if(cmd_log) {
+                fprintf(cmd_log, "compressed stream\n");
+                fprintf(cmd_log, "%02x %02x %02x %02x %02x\t\t type 0x%02x, %u bytes uncompressed\n", dblock->data.compressed.type, (dblock->data.compressed.uncomp_size & 0xFF), ((dblock->data.compressed.uncomp_size >> 8) & 0xFF), ((dblock->data.compressed.uncomp_size >> 16) & 0xFF), ((dblock->data.compressed.uncomp_size >> 24) & 0xFF), dblock->data.compressed.type, dblock->data.compressed.uncomp_size);
+                fprintf(cmd_log, "%02x %02x %02x %02x %02x\t\t %u decompressed bits -> %u compressed bits, subtype 0x%02x, init/offset value 0x%04x\n", dblock->data.compressed.bd, dblock->data.compressed.bc, dblock->data.compressed.subtype, dblock->data.compressed.off & 0xFF, dblock->data.compressed.off >> 8, dblock->data.compressed.bd, dblock->data.compressed.bc, dblock->data.compressed.subtype, dblock->data.compressed.off);
+                logged = true;
+            }
+
+            /* decompress */
+            do {
+                vgm_dblock_t* old_block = dblock;
+                dblock = (vgm_dblock_t*)malloc(VGM_DBLOCK_HEADER_SIZE + dblock->data.compressed.uncomp_size); // allocate new memory for storing decompressed data
+                dblock->type = old_block->type - 0x40; dblock->size = dblock->data.compressed.uncomp_size;
+
+                /* find decompression table */
+                const vgm_dblock_t* dctab = nullptr;
+                if(old_block->data.compressed.type == COMP_DPCM || (old_block->data.compressed.type == COMP_BITPACK && old_block->data.compressed.subtype == BP_TABLE)) {
+                    for(int i = 0; i < _decomp_tables.size(); i++) {
+                        if(_decomp_tables[i]->data.decomp_table.type == old_block->data.compressed.type && _decomp_tables[i]->data.decomp_table.subtype == old_block->data.compressed.subtype) {
+                            dctab = _decomp_tables[i];
+                            break;
+                        }
+                    }
+                    if(!dctab) throw std::runtime_error("cannot find matching decompression table");
+                }
+
+                int in_off = 0, out_off = 0, bits = (old_block->size - 10) << 3;
+                int decomp_bytes = (old_block->data.compressed.bd + 7) >> 3; // decompressed bytes
+                uintptr_t data_off = old_block->data.compressed.off; // used for bitpack (except from decompression table) and DPCM
+                for(int written_bytes = 0; in_off + old_block->data.compressed.bc <= bits; written_bytes++) {
+                    /* read bit-packed data */
+                    uintptr_t data = 0;
+                    for(int i = 0; i < old_block->data.compressed.bc; i++, in_off++) {
+                        data <<= 1;
+                        data |= (old_block->data.compressed.data[in_off >> 3] >> (7 - (in_off & 7))) & 1;
+                    }
+                    
+                    /* perform transformation */
+                    uintptr_t data_tmp = 0; // if needed
+                    switch(old_block->data.compressed.type) {
+                        case COMP_BITPACK: // bitpack compression
+                            switch(old_block->data.compressed.subtype) {
+                                case BP_SHL: // shift left
+                                    data <<= (old_block->data.compressed.bd - old_block->data.compressed.bc);
+                                    /* fall through */
+                                case BP_COPY: // copy
+                                    data += data_off;
+                                    break;
+                                case BP_TABLE: // read from decompression table
+                                    for(int i = 0; i < decomp_bytes; i++) {
+                                        data_tmp <<= 8;
+                                        data_tmp |= dctab->data.decomp_table.data[data * decomp_bytes + i];
+                                    }
+                                    data = data_tmp & ((1 << decomp_bytes) - 1);
+                                    break;
+                            }
+                            break;
+                        case COMP_DPCM: // DPCM compression
+                            /* read from decompression table first */
+                            for(int i = 0; i < decomp_bytes; i++) {
+                                data_tmp <<= 8;
+                                data_tmp |= dctab->data.decomp_table.data[data * decomp_bytes + i];
+                            }
+                            data = data_off + data_tmp; data_off = data;
+                            break;
+                    }
+
+                    /* write to new data block (little endian) */
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+                    for(int i = 0; i < decomp_bytes; i++) {
+                        dblock->data.uncompressed[written_bytes * decomp_bytes + i] = (data >> (i << 3)) & 0xFF; // write little endian
+                    }
+#else
+                    *((uintptr_t*)&dblock->data.uncompressed[written_bytes * decomp_bytes]) = data;
+#endif
+                }
+                
+                if(_stream && _stream_seekable) free(old_block); // old dblock was externally allocated, so we need to deallocate it and not leak memory
+            } while(0);
+
+            dblock->type -= 0x40;
+        case 0x00:
+        case 0x01:
+        case 0x02:
+        case 0x03:
+        case 0x04:
+        case 0x05:
+        case 0x06:
+        case 0x07:
+            /* uncompressed PCM data - save them in our data blocks vector for future consumption */
+            if(cmd_log && !logged) {
+                fprintf(cmd_log, "uncompressed stream\n");
+                // logged = true;
+            }
+
+            _data_blocks.push_back(dblock);
+            break;
+        case 0x80:
+            if(cmd_log) fprintf(cmd_log, "Sega PCM ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.spcm) chips.spcm->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x81:
+            if(cmd_log) fprintf(cmd_log, "OPNA DELTA-T ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.opna) chips.opna->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8, 1);
+            break;
+        case 0x82:
+            if(cmd_log) fprintf(cmd_log, "OPNB ADPCM ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.opnb) chips.opnb->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x83:
+            if(cmd_log) fprintf(cmd_log, "OPNB DELTA-T ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.opnb) chips.opnb->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8, 1);
+            break;
+        case 0x84:
+            if(cmd_log) fprintf(cmd_log, "OPL4 ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.opl4) chips.opl4->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x85:
+            if(cmd_log) fprintf(cmd_log, "OPX ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.opx) chips.opx->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x86:
+            if(cmd_log) fprintf(cmd_log, "PCMD8 ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.pcmd8) chips.pcmd8->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x87:
+            if(cmd_log) fprintf(cmd_log, "OPL4 RAM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.opl4) chips.opl4->write_ram(0, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8); // TODO: can this really be treated as a RAM write?
+            break;
+        case 0x88:
+            if(cmd_log) fprintf(cmd_log, "MSX-Audio DELTA-T ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.msx) chips.msx->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8, 1);
+            break;
+        case 0x89:
+            if(cmd_log) fprintf(cmd_log, "MultiPCM ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.mpcm) chips.mpcm->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x8A:
+            if(cmd_log) fprintf(cmd_log, "uPD7759 ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.pd59) chips.pd59->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x8B:
+            if(cmd_log) fprintf(cmd_log, "OKIM6295 ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.ok95) chips.ok95->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x8C:
+            if(cmd_log) fprintf(cmd_log, "K054539 ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.k39) chips.k39->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x8D:
+            if(cmd_log) fprintf(cmd_log, "C140 ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.c140) chips.c140->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x8E:
+            if(cmd_log) fprintf(cmd_log, "K053260 ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.k60) chips.k60->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x8F:
+            if(cmd_log) fprintf(cmd_log, "QSound ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.qsound) chips.qsound->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x90:
+            if(cmd_log) fprintf(cmd_log, "OTTO ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.otto) chips.otto->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x91:
+            if(cmd_log) fprintf(cmd_log, "X1-010 ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.x1) chips.x1->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x92:
+            if(cmd_log) fprintf(cmd_log, "C352 ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.c352) chips.c352->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0x93:
+            if(cmd_log) fprintf(cmd_log, "GA20 ROM data\n%02x %02x %02x %02x %02x %02x %02x %02x\t\ttotal size %u bytes, block starting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.uncompressed[4], dblock->data.uncompressed[5], dblock->data.uncompressed[6], dblock->data.uncompressed[7], dblock->data.dump.full_size, dblock->data.dump.base);
+            if(chips.ga20) chips.ga20->write_rom(0, dblock->data.dump.full_size, dblock->data.dump.base, dblock->data.dump.data, dblock->size - 8);
+            break;
+        case 0xC0:
+            if(cmd_log) fprintf(cmd_log, "RF5C68 RAM write\n%02x %02x\t\tstarting at 0x%04x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.write_16.base);
+            if(chips.rf68) chips.rf68->write_ram(0, dblock->data.write_16.base, dblock->data.write_16.data, dblock->size - 2);
+            break;
+        case 0xC1:
+            if(cmd_log) fprintf(cmd_log, "RF5C164 RAM write\n%02x %02x\t\tstarting at 0x%04x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.write_16.base);
+            if(chips.rf164) chips.rf164->write_ram(0, dblock->data.write_16.base, dblock->data.write_16.data, dblock->size - 2);
+            break;
+        case 0xC2:
+            if(cmd_log) fprintf(cmd_log, "APU RAM write\n%02x %02x\t\tstarting at 0x%04x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.write_16.base);
+            if(chips.apu) chips.apu->write_ram(0, dblock->data.write_16.base, dblock->data.write_16.data, dblock->size - 2);
+            break;
+        case 0xE0:
+            if(cmd_log) fprintf(cmd_log, "SCSP RAM write\n%02x %02x %02x %02x\t\tstarting at 0x%08x\n", dblock->data.uncompressed[0], dblock->data.uncompressed[1], dblock->data.uncompressed[2], dblock->data.uncompressed[3], dblock->data.write_32.base);
+            if(chips.scsp) chips.scsp->write_ram(0, dblock->data.write_32.base, dblock->data.write_32.data, dblock->size - 4);
+            break;
+        case 0xE1:
+            if(cmd_log) fprintf(cmd_log, "DOC RAM write\n");
+            if(chips.doc) chips.doc->write_ram(0, dblock->data.write_32.base, dblock->data.write_32.data, dblock->size - 4);
+            break;
+        default:
+            if(cmd_log) fprintf(cmd_log, "unknown\n");
+            break;
+    }
 } // 0x67
 
 void vgm_parser::do_pcm_ram_write(uint8_t cmd) {
-    // TODO
+    uint8_t compat = read_u8(); // 0x66 (we'll ignore this)
+    uint8_t type = read_u8(); // chip type (0x00-3F)
+    uint32_t rd_offset = read_u24le(); // read offset
+    uint32_t wr_offset = read_u24le(); // write offset
+    uint32_t size = read_u24le(); if(!size) size = 0x1000000; // data size
+    if(cmd_log) {
+        fprintf(cmd_log, "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\t", cmd, compat, type, (rd_offset & 0xFF), ((rd_offset >> 8) & 0xFF), ((rd_offset >> 16) & 0xFF), (wr_offset & 0xFF), ((wr_offset >> 8) & 0xFF), ((wr_offset >> 16) & 0xFF), (size & 0xFF), ((size >> 8) & 0xFF), ((size >> 16) & 0xFF));  
+        switch(type) {
+            case 0x00: fprintf(cmd_log, "OPN2"); break;
+            case 0x01: fprintf(cmd_log, "RF5C68"); break;
+            case 0x02: fprintf(cmd_log, "RF5C164"); break;
+            case 0x03: fprintf(cmd_log, "PWM"); break;
+            case 0x04: fprintf(cmd_log, "OKIM6258"); break;
+            case 0x05: fprintf(cmd_log, "HuC6280"); break;
+            case 0x06: fprintf(cmd_log, "SCSP"); break;
+            case 0x07: fprintf(cmd_log, "APU"); break;
+            default: break; // unknown
+        }
+        fprintf(cmd_log, "\tPCM RAM write: block:addr 0x%02x:0x%06x -> addr 0x%06x (%u bytes)\n", type, rd_offset, wr_offset, size);
+    }
+
+    /* find data block */
+    const vgm_dblock_t* dblock = nullptr;
+    for(int i = 0; i < _data_blocks.size(); i++) {
+        if(_data_blocks[i]->type == type) {
+            dblock = _data_blocks[i];
+            break;
+        }
+    }
+    if(!dblock) throw std::runtime_error("cannot find suitable data block");
+
+    switch(type) {
+        case 0x00:
+            if(chips.opn2) chips.opn2->write_ram(0, wr_offset, &dblock->data.uncompressed[rd_offset], size);
+            break;
+        case 0x01:
+            if(chips.rf68) chips.rf68->write_ram(0, wr_offset, &dblock->data.uncompressed[rd_offset], size);
+            break;
+        case 0x02:
+            if(chips.rf164) chips.rf164->write_ram(0, wr_offset, &dblock->data.uncompressed[rd_offset], size);
+            break;
+        case 0x03:
+            if(chips.pwm) chips.pwm->write_ram(0, wr_offset, &dblock->data.uncompressed[rd_offset], size);
+            break;
+        case 0x04:
+            if(chips.ok58) chips.ok58->write_ram(0, wr_offset, &dblock->data.uncompressed[rd_offset], size);
+            break;
+        case 0x05:
+            if(chips.hu) chips.hu->write_ram(0, wr_offset, &dblock->data.uncompressed[rd_offset], size);
+            break;
+        case 0x06:
+            if(chips.scsp) chips.scsp->write_ram(0, wr_offset, &dblock->data.uncompressed[rd_offset], size);
+            break;
+        case 0x07:
+            if(chips.apu) chips.apu->write_ram(0, wr_offset, &dblock->data.uncompressed[rd_offset], size);
+            break;
+        default: break; // unknown
+    }
 } // 0x68
 
 void vgm_parser::do_opn2_bank_write(uint8_t cmd) {
     uint8_t wait_samples = cmd & 0x0F;
     if(cmd_log) fprintf(cmd_log, "%02x\tOPN2#1\tport 0 reg 0x2A <- data bank + wait %u samples\n", cmd, wait_samples);
-    // TODO
+    
+    /* find data block */
+    const vgm_dblock_t* dblock = nullptr;
+    for(int i = 0; i < _data_blocks.size(); i++) {
+        if(!_data_blocks[i]->type) { // 0x00
+            dblock = _data_blocks[i];
+            break;
+        }
+    }
+    if(!dblock) throw std::runtime_error("cannot find suitable data block");
+
+    if(_opn2_bank_offset >= dblock->size - 5) {
+        /* we've reached the end of the data block */
+        return; // TODO
+    }
+
+    if(chips.opn2) chips.opn2->write(0, 0, 0x2A, dblock->data.uncompressed[_opn2_bank_offset++]);
+    wait(wait_samples);
 } // 0x8n
 
 void vgm_parser::do_dac_stream_setup(uint8_t cmd) {
@@ -465,9 +793,8 @@ void vgm_parser::do_doc_write(uint8_t cmd) {
 } // 0xD5
 
 void vgm_parser::do_opn2_bank_seek(uint8_t cmd) {
-    uint32_t offset = read_u32le();
-    if(cmd_log) fprintf(cmd_log, "%02x %02x %02x %02x %02x\tOPN2#1\tseek data bank to 0x%08x\n", cmd, ((offset) & 0xFF), ((offset >> 8) & 0xFF), ((offset >> 16) & 0xFF), ((offset >> 24) & 0xFF), offset);
-    // TODO
+    _opn2_bank_offset = read_u32le();
+    if(cmd_log) fprintf(cmd_log, "%02x %02x %02x %02x %02x\tOPN2#1\tseek data bank to 0x%08lx\n", cmd, (uint8_t)((_opn2_bank_offset) & 0xFF), (uint8_t)((_opn2_bank_offset >> 8) & 0xFF), (uint8_t)((_opn2_bank_offset >> 16) & 0xFF), (uint8_t)((_opn2_bank_offset >> 24) & 0xFF), _opn2_bank_offset);
 } // 0xE0
 
 void vgm_parser::do_c352_write(uint8_t cmd) {

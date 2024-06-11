@@ -1,11 +1,13 @@
 #pragma once
 
 #include <vgm_header.h>
+#include <vgm_dblock.h>
 #include <vgm_chip.h>
 #include <gd3.h>
 
 #include <iostream>
 #include <stdio.h>
+#include <vector>
 
 class vgm_parser {
 public:
@@ -86,9 +88,10 @@ public:
 
     bool parse_next(); // parse next command, returns inverse of play_ended value (i.e. whether there's still more stuff to be played)
 
+    const std::vector<vgm_dblock_t const*>& data_blocks = _data_blocks;
+    const std::vector<vgm_dblock_t const*>& decomp_tables = _decomp_tables;
 private:
     void init_stub(bool read_all);
-
     
     gd3* _gd3 = nullptr; // null if GD3 tag isn't parsed
 
@@ -107,11 +110,16 @@ private:
 
     bool _play_ended = false; // set when there's no more stuff to be played in this file
 
+    std::vector<vgm_dblock_t const*> _data_blocks;
+    std::vector<vgm_dblock_t const*> _decomp_tables;
+
     /* command data reading helpers */
     int read_data();
     uint8_t read_u8(); // NOTE: read_u8(), read_u16le(), read_u16be(), read_u32le() and read_u32ne() will throw runtime errors if there's an unexpected EOF
     uint16_t read_u16le();
     uint16_t read_u16be();
+    uint32_t read_u24le();
+    uint32_t read_u24be();
     uint32_t read_u32le();
     uint32_t read_u32be();
 
@@ -177,4 +185,8 @@ private:
     void do_rsvd_2(uint8_t cmd); // 0x41..4E
     void do_rsvd_3(uint8_t cmd); // 0xC9..CF/D7..DF
     void do_rsvd_4(uint8_t cmd); // 0xE2..FF
+
+    void wait(size_t n);
+
+    size_t _opn2_bank_offset = 0; // for 0x8n and 0xE0
 };

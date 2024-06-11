@@ -13,6 +13,8 @@ public:
 
     virtual void next_sample() = 0;
     virtual void write(uintptr_t chip, uintptr_t port, uintptr_t addr_reg, uintptr_t val) = 0;
+    virtual void write_rom(uintptr_t chip, size_t total_size, uintptr_t base_addr, const uint8_t* data, size_t len, size_t type = 0);
+    virtual void write_ram(uintptr_t chip, uintptr_t base_addr, const uint8_t* data, size_t len);
     const size_t channels; // number of channels
     const float* channels_out = _channels_out; // channel outputs
     const pff* channels_pan = _channels_pan; // channel levels per output (left, right) - for mixing

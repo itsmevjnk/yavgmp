@@ -64,6 +64,26 @@ uint16_t vgm_parser::read_u16be() {
     return ret;
 }
 
+uint32_t vgm_parser::read_u24le() {
+    uint32_t ret = 0;
+    for(size_t i = 0; i < 3; i++) {
+        int data = read_data();
+        if(data == EOF) throw std::runtime_error("unexpected EOF");
+        ret |= (uint8_t)data << (i << 3);
+    }
+    return ret;
+}
+
+uint32_t vgm_parser::read_u24be() {
+    uint32_t ret = 0;
+    for(size_t i = 0; i < 3; i++) {
+        int data = read_data();
+        if(data == EOF) throw std::runtime_error("unexpected EOF");
+        ret |= (uint8_t)data << ((3 - i) << 3);
+    }
+    return ret;
+}
+
 uint32_t vgm_parser::read_u32le() {
     uint32_t ret = 0;
     for(size_t i = 0; i < 4; i++) {
