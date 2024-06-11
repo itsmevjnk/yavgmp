@@ -7,3 +7,4 @@ project(
 
 add_subdirectory(psg)
 add_subdirectory(opll)
+add_subdirectory(ay8910)

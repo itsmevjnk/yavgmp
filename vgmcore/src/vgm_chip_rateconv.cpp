@@ -4,7 +4,7 @@
 
 #define _PI_ 3.14159265358979323846264338327950288
 
-#define SINCTAB_AMP                             (1.0 / 0.091879) // amplitude to amplify the sinc table up to (so that input data of range -1.0 .. 1.0 gets transformed to -1.0 .. 1.0)
+// #define SINCTAB_AMP                             (1.0 / 0.091879) // amplitude to amplify the sinc table up to (so that input data of range -1.0 .. 1.0 gets transformed to -1.0 .. 1.0)
 
 static double _blackman(double x) {
     return 0.42 - 0.5 * cos(2 * _PI_ * x) + 0.08 * cos(4 * _PI_ * x);
@@ -35,7 +35,7 @@ vgm_chip_rateconv::vgm_chip_rateconv(size_t num_channels, size_t f_in) : _f_rati
         } else {
             _sinctab[i] = _windowed_sinc(x);
         }
-        _sinctab[i] *= SINCTAB_AMP;
+        // _sinctab[i] *= SINCTAB_AMP;
     }
 }
 

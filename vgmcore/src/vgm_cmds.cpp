@@ -1,10 +1,12 @@
 #include <vgm_parser.h>
 
 void vgm_parser::do_ay8910_stereo_mask(uint8_t cmd) {
-    uint8_t chip = (cmd & 0x80) >> 7;
     uint8_t mask = read_u8();
-    if(cmd_log) fprintf(cmd_log, "%02x %02x\tAY8910#%u\tstereo mask 0x%02x\n", cmd, mask, chip, mask);
-    if(chips.ay8910) chips.ay8910->write(chip, 1, 0, mask);
+    uint8_t chip = (mask & 0x80) >> 7;
+    bool ym = (mask & 0x40);
+    if(cmd_log) fprintf(cmd_log, "%02x %02x\t%s#%u\tstereo mask 0x%02x\n", cmd, mask, (ym) ? "OPN" : "AY8910", chip, mask & 0x3F);
+    vgm_chip* emu = (ym) ? chips.opn : chips.ay8910;
+    if(emu) emu->write(chip, 1, 0, mask & 0x3F);
 } // 0x31
 
 void vgm_parser::do_mikey_write(uint8_t cmd) {

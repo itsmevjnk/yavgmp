@@ -7,3 +7,6 @@
 [submodule "vgmchips/opll/emu2413"]
 	path = vgmchips/opll/emu2413
 	url = https://github.com/digital-sound-antiques/emu2413
+[submodule "vgmchips/ay8910/emu2149"]
+	path = vgmchips/ay8910/emu2149
+	url = https://github.com/digital-sound-antiques/emu2149
