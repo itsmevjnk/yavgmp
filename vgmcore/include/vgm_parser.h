@@ -59,11 +59,11 @@ public:
         vgm_chip* mpcm = nullptr;
         vgm_chip* pd59 = nullptr;
         vgm_chip* ok58 = nullptr;
-        vgm_chip* k39 = nullptr;
-        vgm_chip* c140 = nullptr;
         vgm_chip* ok95 = nullptr;
         vgm_chip* scc = nullptr;
+        vgm_chip* k39 = nullptr;
         vgm_chip* hu = nullptr;
+        vgm_chip* c140 = nullptr;
         vgm_chip* k60 = nullptr;
         vgm_chip* pokey = nullptr;
         vgm_chip* qsound = nullptr;
