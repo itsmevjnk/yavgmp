@@ -33,9 +33,9 @@ int main() {
     float min_amp = INFINITY, max_amp = -INFINITY;
     for(int i = 0; i < SAMPLES; i++) {
         test.next_sample();
-        fwrite(&test.channels_out[0], sizeof(float), 1, output);
-        if(test.channels_out[0] > max_amp) max_amp = test.channels_out[0];
-        if(test.channels_out[0] < min_amp) min_amp = test.channels_out[0];
+        fwrite(&test.channels_out_left[0], sizeof(float), 1, output);
+        if(test.channels_out_left[0] > max_amp) max_amp = test.channels_out_left[0];
+        if(test.channels_out_left[0] < min_amp) min_amp = test.channels_out_left[0];
     }
     printf("%u samples written\nmin amplitude: %f\nmax amplitude: %f\n", SAMPLES, min_amp, max_amp);
     fclose(output);

@@ -13,6 +13,7 @@
 
 #include <opll_wrapper.h>
 #include <opl_wrapper.h>
+#include <opn2_wrapper.h>
 #include <emu2149_wrapper.h>
 #include <scc_wrapper.h>
 
@@ -71,10 +72,10 @@ uint8_t wav_header[] = {
 	/* 0x0C */ 'f', 'm', 't', ' ',
 	/* 0x10 */ 0x10, 0x00, 0x00, 0x00, // chunk size minus 8 (16)
 	/* 0x14 */ 0x03, 0x00, // float32 format
-	/* 0x16 */ 0x01, 0x00, // mono
+	/* 0x16 */ 0x00, 0x00, // stereo = 2, mono = 1
 	/* 0x18 */ 0x44, 0xAC, 0x00, 0x00, // sample rate (44100 Hz)
-	/* 0x1C */ 0x10, 0xB1, 0x02, 0x00, // bytes to read per second (44100 * 4)
-	/* 0x20 */ 0x04, 0x00, // bytes per block (4 - aka 32 bit)
+	/* 0x1C */ 0x00, 0x00, 0x00, 0x00, // bytes to read per second (44100 * 4 * 1 = 10 B1 02 00 if mono, or 44100 * 4 * 2 = 20 62 05 00 if stereo)
+	/* 0x20 */ 0x00, 0x00, // bytes per block (4 if mono, or 8 if stereo)
 	/* 0x22 */ 0x20, 0x00, // bits per sample (32)
 
 	/* data chunk */
@@ -95,11 +96,19 @@ bool new_sample_handler(vgm_parser* parser) {
 			
 			for(int j = 0; j < num_channels; j++) {
 				if(outputs[i][j]) {
-					uint32_t samp = *((uint32_t*)&parser->chips_array[i]->channels_out[j]); // convert float to uint32_t
+					uint32_t samp = *((uint32_t*)&parser->chips_array[i]->channels_out_left[j]); // convert float to uint32_t
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 					samp = ENDIAN_FLIP_32(samp); // convert to little endian
 #endif
 					fwrite(&samp, 4, 1, outputs[i][j]);
+					if(parser->chips_array[i]->stereo) {
+						/* write right channel */
+						samp = *((uint32_t*)&parser->chips_array[i]->channels_out_right[j]);
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+						samp = ENDIAN_FLIP_32(samp);
+#endif						
+						fwrite(&samp, 4, 1, outputs[i][j]);
+					}
 				}
 			}
 		}
@@ -124,6 +133,7 @@ int main(int argc, char* argv[]) {
 #endif
 	opll_wrapper::install(vgm);
 	opl_wrapper::install(vgm);
+	opn2_wrapper::install(vgm);
 	emu2149_wrapper::install(vgm);
 	scc_wrapper::install(vgm);
 
@@ -135,16 +145,6 @@ int main(int argc, char* argv[]) {
 	memset(outputs, 0, sizeof(outputs)); // clear out our outputs list
 
 play_section:
-	/* calculate data size to be put into the WAV header */
-	uint32_t data_size = 4 * section_samples;
-	uint32_t file_size = data_size + 32;
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-	data_size = ENDIAN_FLIP_32(data_size);
-	file_size = ENDIAN_FLIP_32(file_size);
-#endif
-	*((uint32_t*)&wav_header[0x04]) = file_size;
-	*((uint32_t*)&wav_header[0x28]) = data_size;
-
 	/* open output files */
 	for(int i = 0; i < sizeof(outputs) / sizeof(outputs[0]); i++) {
 		if(vgm.chips_array[i]) {
@@ -161,6 +161,19 @@ play_section:
 				if(!outputs[i][j]) printf("cannot open %s\n", path_buf);
 				else {
 					printf("sec#%d: %s channel %d will be dumped to %s\n", section, chips[i], j, path_buf);
+
+					/* calculate fields to be put into the WAV header */
+					bool stereo = vgm.chips_array[i]->stereo;
+					uint32_t data_size = 4 * section_samples * (stereo ? 2 : 1);
+					uint32_t file_size = data_size + 32;
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+					data_size = ENDIAN_FLIP_32(data_size);
+					file_size = ENDIAN_FLIP_32(file_size);
+#endif
+					*((uint32_t*)&wav_header[0x04]) = file_size;
+					*((uint32_t*)&wav_header[0x28]) = data_size;
+					*((uint8_t*)&wav_header[0x16]) = stereo ? 2 : 1;
+					memcpy(&wav_header[0x1C], (stereo) ? "\x20\x62\x05" : "\x10\xB1\x02", 4); // 4th byte will be 0 since the strings are null-terminated
 					fwrite(wav_header, sizeof(wav_header), 1, outputs[i][j]); // write header
 				}
 			}
