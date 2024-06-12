@@ -231,7 +231,7 @@ void vgm_parser::do_data_block(uint8_t cmd) {
             do {
                 vgm_dblock_t* old_block = dblock;
                 dblock = (vgm_dblock_t*)malloc(VGM_DBLOCK_HEADER_SIZE + dblock->data.compressed.uncomp_size); // allocate new memory for storing decompressed data
-                dblock->type = old_block->type - 0x40; dblock->size = dblock->data.compressed.uncomp_size;
+                dblock->type = old_block->type - 0x40; dblock->size = old_block->data.compressed.uncomp_size;
 
                 /* find decompression table */
                 const vgm_dblock_t* dctab = nullptr;
@@ -299,7 +299,7 @@ void vgm_parser::do_data_block(uint8_t cmd) {
                 if(_stream && _stream_seekable) free(old_block); // old dblock was externally allocated, so we need to deallocate it and not leak memory
             } while(0);
 
-            dblock->type -= 0x40;
+            // dblock->type -= 0x40;
         case 0x00:
         case 0x01:
         case 0x02:
