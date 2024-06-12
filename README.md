@@ -23,7 +23,7 @@ make
 ## Usage
 This project's "backend" consists of the following directories:
 * `vgmcore`: The main code of the backend, including file parsing and emulator interface.
-* `vgmchips`: An assortment of sound chip emulators. Currently supported chips are: SN76489, YM2413, and YM2149/AY-3-8910.
+* `vgmchips`: An assortment of sound chip emulators. Currently supported chips are: SN76489, YM2413, YM3526, YM3812, Y8950, and YM2149/AY-3-8910.
 
 A couple of tools are also available from this project, which utilises the backend:
 * `vgmcdump`: Dump a VGM file's audio output into files for each chip's channel.

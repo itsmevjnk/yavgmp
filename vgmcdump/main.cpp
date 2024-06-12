@@ -12,6 +12,7 @@
 #endif
 
 #include <opll_wrapper.h>
+#include <opl_wrapper.h>
 #include <emu2149_wrapper.h>
 
 /* chip names according to their position in vgm_parser::chips */
@@ -121,6 +122,7 @@ int main(int argc, char* argv[]) {
 	psg_wrapper::install(vgm);
 #endif
 	opll_wrapper::install(vgm);
+	opl_wrapper::install(vgm);
 	emu2149_wrapper::install(vgm);
 
 	vgm.on_new_sample = &new_sample_handler; // set sample handler

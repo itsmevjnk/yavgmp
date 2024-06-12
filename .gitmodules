@@ -10,3 +10,6 @@
 [submodule "vgmchips/ay8910/emu2149"]
 	path = vgmchips/ay8910/emu2149
 	url = https://github.com/digital-sound-antiques/emu2149
+[submodule "vgmchips/opl/emu8950"]
+	path = vgmchips/opl/emu8950
+	url = https://github.com/digital-sound-antiques/emu8950
