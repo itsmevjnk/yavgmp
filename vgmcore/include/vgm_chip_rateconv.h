@@ -15,12 +15,10 @@ public:
     virtual void clock() = 0;
 
     virtual void put_sample(size_t channel, float val, bool side = false);
-    void reset_rateconv();
 private:
     const bool _stereo;
-    const float _f_ratio;
-    float* _buf;
-    float _timer = 0;
-
-    float _sinctab[RATECONV_SINC_RESO * RATECONV_LW / 2];
+    const float _rate_ratio;
+    float* _samples_left = nullptr, *_samples_right = nullptr;
+    float* _old_samples_left = nullptr, *_old_samples_right = nullptr;
+    float _sample_cnt = 0;
 };
