@@ -52,7 +52,7 @@ static inline float lookup_sinc_table(const float* table, double x) {
 
 void vgm_chip_rateconv::put_sample(size_t channel, float val, bool side) {
     if(channel >= channels) return;
-    float* buf = (_stereo) ? &_buf[channel * 2 * RATECONV_LW + ((side) ? 1 : 0)] : &_buf[channel * RATECONV_LW];
+    float* buf = (_stereo) ? &_buf[(channel * 2 + ((side) ? 1 : 0)) * RATECONV_LW] : &_buf[channel * RATECONV_LW];
     memmove(buf, &buf[1], sizeof(float) * (RATECONV_LW - 1));
     buf[RATECONV_LW - 1] = val;
 }
@@ -71,8 +71,8 @@ void vgm_chip_rateconv::next_sample() {
             _channels_out_left[i] = _channels_out_right[i] = 0;
             for(int k = 0; k < RATECONV_LW; k++) {
                 double x = ((double)k - (RATECONV_LW / 2 - 1)) - dn;
-                _channels_out_left[i] += buf[k << 1] * lookup_sinc_table(_sinctab, x);
-                _channels_out_right[i] += buf[(k << 1) | 1] * lookup_sinc_table(_sinctab, x);
+                _channels_out_left[i] += buf[k] * lookup_sinc_table(_sinctab, x);
+                _channels_out_right[i] += buf[RATECONV_LW + k] * lookup_sinc_table(_sinctab, x);
             }
         } else {
             float* buf = &_buf[i * RATECONV_LW];
