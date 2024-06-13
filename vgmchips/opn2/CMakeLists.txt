@@ -10,9 +10,6 @@ add_library(
     opn2_wrapper.cpp opn2_wrapper.h
 )
 
-# comment below line to mix channels' left and right outputs into mono (NOT RECOMMENDED!)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DOPN2_STEREO_CHANNELS")
-
 target_include_directories(opn2_wrapper PUBLIC .)
 target_include_directories(opn2_wrapper PUBLIC ../../vgmcore/include)
 

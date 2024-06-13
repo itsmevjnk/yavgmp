@@ -10,12 +10,9 @@ opn2_wrapper::opn2_wrapper(const vgm_header_t& header) : _dual_chip(header.opn2_
     vgm_chip_rateconv(
         (header.opn2_clock & VGM_CLOCK_DUAL) ? 12 : 6,
         VGM_CLOCK(header.opn2_clock) / (float)(6 * 24), // 6 master clocks per internal clock * 24 internal clocks per cycle run
-#ifdef OPN2_STEREO_CHANNELS
         true
-#else
-        false
-#endif
     ) {
+    _mix_rconv = new rateconv((header.opn2_clock & VGM_CLOCK_DUAL) ? 4 : 2, VGM_CLOCK(header.opn2_clock) / 6.0, 44100.0); // we'll have data to feed into this on every internal clock cycle
     _chips[0] = new_chip(header.opn2_clock);
     if(_dual_chip) _chips[1] = new_chip(header.opn2_clock);
     // OPN2_SetChipType((header.opn2_clock & (1 << 31)) ? 0 : ym3438_mode_ym2612); // determine if we need to enable YM2612 emulation
@@ -32,11 +29,7 @@ void opn2_wrapper::update_chip(int idx) {
     int channel = -1;
 
     ym3438_t* chip = _chips[idx];
-#ifdef OPN2_STEREO_CHANNELS
     float samples[6][2] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};
-#else
-    float samples[6] = {0, 0, 0, 0, 0, 0};
-#endif
     int sample_cnts[6] = {0, 0, 0, 0, 0, 0};
     for(int i = 0; i < 24; i++) {
         switch(chip->cycles >> 2) {
@@ -53,12 +46,14 @@ void opn2_wrapper::update_chip(int idx) {
         
         if(channel >= 0) {
             if(!mute) {
-#ifdef OPN2_STEREO_CHANNELS
-                samples[channel][0] += buf[0] / 256.0; // ym3438.h says MOL and MOR are 9-bit signed values
-                samples[channel][1] += buf[1] / 256.0;
-#else
-                samples[channel] += (buf[0] + buf[1]) / (2 * 256.0);
-#endif
+                float left = buf[0] / 256.0, right = buf[1] / 256.0; // ym3438.h says MOL and MOR are 9-bit signed values
+                samples[channel][0] += left;
+                samples[channel][1] += right;
+                _mix_rconv->put_sample((idx << 1), left * _channels_pan[(idx * 6) + channel].first);
+                _mix_rconv->put_sample((idx << 1) | 1, right * _channels_pan[(idx * 6) + channel].second);
+            } else {
+                _mix_rconv->put_sample((idx << 1), 0);
+                _mix_rconv->put_sample((idx << 1) | 1, 0);
             }
             sample_cnts[channel]++;
         }
@@ -75,19 +70,11 @@ void opn2_wrapper::update_chip(int idx) {
     /* add sample to rate converter */
     for(int ch = 0; ch < 6; ch++) {
         if(sample_cnts[ch]) {
-#ifdef OPN2_STEREO_CHANNELS
             samples[ch][0] /= sample_cnts[ch];
             samples[ch][1] /= sample_cnts[ch];
-#else
-            samples[ch] /= sample_cnts[ch];
-#endif
         }
-#ifdef OPN2_STEREO_CHANNELS
         put_sample(ch, samples[ch][0], false);
         put_sample(ch, samples[ch][1], true);
-#else
-        put_sample(ch, samples[ch]);
-#endif
     }
 }
 
@@ -107,4 +94,14 @@ void opn2_wrapper::install(vgm_parser& parser) {
     if(!parser.header.fields.opn2_clock) return; // no need to install if it's not used
     if(parser.chips.opn2) delete parser.chips.opn2;
     parser.chips.opn2 = new opn2_wrapper(parser.header.fields);
+}
+
+pff opn2_wrapper::mix_channels() {
+    _mix_rconv->advance_timer();
+    float left = _mix_rconv->get_sample(0), right = _mix_rconv->get_sample(1);
+    if(_dual_chip) {
+        left = (left + _mix_rconv->get_sample(2)) / 2;
+        right = (right + _mix_rconv->get_sample(3)) / 2;
+    }
+    return std::make_pair(left, right);
 }
