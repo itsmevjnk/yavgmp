@@ -23,6 +23,8 @@ opn2_wrapper::~opn2_wrapper() {
     if(_dual_chip) delete _chips[1];
 }
 
+#define OPN2_MIX_AMP                            2.5 // amplification factor for mixed outputs (to counteract volume drop due to resampling)
+
 /* adapted from Wohlstand's OPN2_Generate function */
 void opn2_wrapper::update_chip(int idx) {
     uint32_t mute = 0;
@@ -81,6 +83,16 @@ void opn2_wrapper::update_chip(int idx) {
 void opn2_wrapper::clock() {
     update_chip(0);
     if(_dual_chip) update_chip(1);
+
+    /* calculate mixed output */
+    _mix_rconv->advance_timer();
+    _mix_output.first = _mix_rconv->get_sample(0);
+    _mix_output.second = _mix_rconv->get_sample(1);
+    if(_dual_chip) {
+        _mix_output.first = (_mix_output.first + _mix_rconv->get_sample(2)) / 2;
+        _mix_output.second = (_mix_output.second + _mix_rconv->get_sample(3)) / 2;
+    }
+    _mix_output.first *= OPN2_MIX_AMP; _mix_output.second *= OPN2_MIX_AMP;
 }
 
 void opn2_wrapper::write(uintptr_t chip, uintptr_t port, uintptr_t addr_reg, uintptr_t val) {
@@ -97,11 +109,5 @@ void opn2_wrapper::install(vgm_parser& parser) {
 }
 
 pff opn2_wrapper::mix_channels() {
-    _mix_rconv->advance_timer();
-    float left = _mix_rconv->get_sample(0), right = _mix_rconv->get_sample(1);
-    if(_dual_chip) {
-        left = (left + _mix_rconv->get_sample(2)) / 2;
-        right = (right + _mix_rconv->get_sample(3)) / 2;
-    }
-    return std::make_pair(left, right);
+    return _mix_output;
 }

@@ -84,18 +84,19 @@ uint8_t wav_header[] = {
 	/* 0x28 */ 0x00, 0x00, 0x00, 0x00 // data size (4 * samples)
 };
 
+FILE* mixed_output; // final mixed output file
 FILE** outputs[sizeof(chips) / sizeof(chips[0])]; // list of arrays to file handlers (one file per channel)
 
 #define ENDIAN_FLIP_32(x)					((((x) & 0x000000FF) << 24) | (((x) & 0x0000FF00) << 8) | (((x) & 0x00FF0000) >> 8) | (((x) & 0xFF000000) >> 24))
 
 /* actual dump function */
 bool new_sample_handler(vgm_parser* parser) {
+	float samp_float; uint32_t* samp = (uint32_t*)&samp_float; // temp variable for sample and its uint32_t cast
 	for(int i = 0; i < sizeof(outputs) / sizeof(outputs[0]); i++) {
 		if(parser->chips_array[i]) {
 			/* dump samples from chip */
 			int num_channels = parser->chips_array[i]->channels;
 			
-			float samp_float; uint32_t* samp = (uint32_t*)&samp_float;
 			for(int j = 0; j < num_channels; j++) {
 				if(outputs[i][j]) {
 					samp_float = parser->chips_array[i]->channels_out_left[j] * parser->chips_array[i]->channels_pan[j].first;
@@ -125,6 +126,20 @@ bool new_sample_handler(vgm_parser* parser) {
 				fwrite(samp, 4, 1, outputs[i][num_channels]);
 			}
 		}
+	}
+
+	if(mixed_output) {
+		pff out = parser->mix_outputs();
+		samp_float = out.first;
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+		*samp = ENDIAN_FLIP_32(*samp); // convert to little endian
+#endif
+		fwrite(samp, 4, 1, mixed_output);
+		samp_float = out.second;
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+		*samp = ENDIAN_FLIP_32(*samp);
+#endif						
+		fwrite(samp, 4, 1, mixed_output);
 	}
 
 	return true; // continue playing
@@ -170,6 +185,15 @@ play_section:
 	*((uint32_t*)&wav_header[0x28]) = data_size;
 
 	/* open output files */
+	char path_buf[257];
+	snprintf(path_buf, 257, "%s_%d_mixed.wav", argv[argc - 1], section);
+	mixed_output = fopen(path_buf, "wb");
+	if(!mixed_output) printf("cannot open %s\n", path_buf);
+	else {
+		printf("sec#%d: final mixed output will be dumped to %s\n", section, path_buf);
+		fwrite(wav_header, sizeof(wav_header), 1, mixed_output); // write header
+	}
+
 	for(int i = 0; i < sizeof(outputs) / sizeof(outputs[0]); i++) {
 		if(vgm.chips_array[i]) {
 			/* chip exists - create channel outputs for it */
@@ -178,7 +202,6 @@ play_section:
 				outputs[i] = new FILE*[num_channels + 1]; // NOTE: we don't need to delete since the program will exit anyway
 			}
 			memset(outputs[i], 0, (num_channels + 1) * sizeof(FILE*)); // to be sure
-			char path_buf[257];
 			for(int j = 0; j < num_channels; j++) {
 				snprintf(path_buf, 257, "%s_%d_%s_%d.wav", argv[argc - 1], section, chips[i], j);
 				outputs[i][j] = fopen(path_buf, "wb");
@@ -214,6 +237,7 @@ play_section:
 			}
 		}
 	}
+	if(mixed_output) fclose(mixed_output);
 
 	if(!vgm.play_ended && !vgm.played_loops && vgm.header.fields.loop_samples) {
 		if(section) return 0; // done

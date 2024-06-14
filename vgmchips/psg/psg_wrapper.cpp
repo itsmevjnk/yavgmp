@@ -22,12 +22,13 @@ psg_wrapper::~psg_wrapper() {
     if(_dual_chip) SNG_delete(_chips[1]);
 }
 
+#define PSG_MAX_VOLUME (1.0 / 4)
 void psg_wrapper::update_chip(int idx) {
     SNG_calc(_chips[idx]);
     
     /* convert channel outputs from int16_t to float */
     for(int i = 0; i < 4; i++) {
-        _channels_out[idx * 4 + i] = _chips[idx]->ch_out[i] / (256.0 * (1 << 4)); // TODO: remove DC offset
+        _channels_out[idx * 4 + i] = _chips[idx]->ch_out[i] / (256.0 * (1 << 4) * PSG_MAX_VOLUME); // TODO: remove DC offset
         if(_neg_output) _channels_out[idx * 4 + i] = 1.0 - _channels_out[idx * 4 + i];
     }
 }

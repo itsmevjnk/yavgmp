@@ -30,7 +30,8 @@ pff vgm_chip::mix_channels() {
         left += _channels_out_left[i] * _channels_pan[i].first;
         right += _channels_out_right[i] * _channels_pan[i].second;
     }
-    return std::make_pair(left / channels, right / channels);
+    // return std::make_pair(left / channels, right / channels);
+    return std::make_pair(left, right); // do not pre-attenuate, otherwise we'll end up with very quiet output
 }
 
 /* many chips won't have this method implemented, so it's safer to provide a generic implementation that throws an error */

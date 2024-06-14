@@ -90,6 +90,9 @@ public:
 
     const std::vector<vgm_dblock_t const*>& data_blocks = _data_blocks;
     const std::vector<vgm_dblock_t const*>& decomp_tables = _decomp_tables;
+
+    static const float chip_volumes[];
+    pff mix_outputs();
 private:
     void init_stub(bool read_all);
     

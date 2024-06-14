@@ -18,6 +18,7 @@ public:
 private:
     const bool _dual_chip;
     rateconv* _mix_rconv; // for mixing channels (since OPN2 uses time-division multiplexing)
+    pff _mix_output; // mixed output (written by clock(), to be returned by mix_channels())
     
     ym3438_t* _chips[2] = {nullptr, nullptr}; // chips
 
