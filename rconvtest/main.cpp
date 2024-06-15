@@ -30,10 +30,10 @@ private:
 int main() {
     FILE* output = fopen("output.dat", "wb");
     rctest test;
-    float min_amp = INFINITY, max_amp = -INFINITY;
+    sample_t min_amp = INFINITY, max_amp = -INFINITY;
     for(int i = 0; i < SAMPLES; i++) {
         test.next_sample();
-        fwrite(&test.channels_out_left[0], sizeof(float), 1, output);
+        fwrite(&test.channels_out_left[0], sizeof(sample_t), 1, output);
         if(test.channels_out_left[0] > max_amp) max_amp = test.channels_out_left[0];
         if(test.channels_out_left[0] < min_amp) min_amp = test.channels_out_left[0];
     }

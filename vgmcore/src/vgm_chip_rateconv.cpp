@@ -8,7 +8,7 @@ vgm_chip_rateconv::~vgm_chip_rateconv() {
     delete _rconv;
 }
 
-void vgm_chip_rateconv::put_sample(size_t channel, float val, bool side) {
+void vgm_chip_rateconv::put_sample(size_t channel, sample_t val, bool side) {
     if(channel >= channels) return;
     if(!stereo) side = false;
     _rconv->put_sample(channel + (side ? channels : 0), val);

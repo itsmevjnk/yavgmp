@@ -16,7 +16,7 @@
 
 /* volume table */
 #define PSG_MAX_VOLUME (0.5 / 4)
-static float voltbl[16] = {
+static sample_t voltbl[16] = {
     PSG_MAX_VOLUME * 1.0,
     PSG_MAX_VOLUME * 0.7943282347242815,
     PSG_MAX_VOLUME * 0.6309573444801932,
@@ -54,12 +54,12 @@ void psg_emu::set_quality(bool q) {
     internal_refresh();
 }
 
-psg_emu::psg_emu(size_t clock, float* output_buf, pff* pan_buf, size_t lfsr_width, size_t lfsr_pattern, bool neg_output, bool no_gg_stereo, bool xnor_noise)
+psg_emu::psg_emu(size_t clock, sample_t* output_buf, stereo_volume_t* pan_buf, size_t lfsr_width, size_t lfsr_pattern, bool neg_output, bool no_gg_stereo, bool xnor_noise)
      : _clock(clock), _channels_out(output_buf), _channels_pan(pan_buf), _lfsr_width(lfsr_width), _lfsr_pattern(lfsr_pattern), _neg_output(neg_output), _no_gg_stereo(no_gg_stereo), _xnor_noise(xnor_noise) {
     internal_refresh();
     reset();
 }
-psg_emu::psg_emu(const vgm_header_t& header, float* output_buf, pff* pan_buf)
+psg_emu::psg_emu(const vgm_header_t& header, sample_t* output_buf, stereo_volume_t* pan_buf)
      : _clock(VGM_CLOCK(header.psg_clock)), _channels_out(output_buf), _channels_pan(pan_buf), _lfsr_width(header.psg_sr_width), _lfsr_pattern(header.psg_fb_pattern), _neg_output(header.psg_flags & PSG_NEG_OUTPUT), _no_gg_stereo(header.psg_flags & PSG_NO_GG_STEREO), _xnor_noise(header.psg_flags & PSG_XNOR_NOISE) {
     internal_refresh();
     reset();
@@ -84,7 +84,7 @@ void psg_emu::reset() {
 
     for(size_t i = 0; i < 4; i++) {
         _channels_out[i] = 0;
-        _channels_pan[i] = std::make_pair<float, float>(1, 1);
+        _channels_pan[i] = std::make_pair(1, 1);
     }
 }
 

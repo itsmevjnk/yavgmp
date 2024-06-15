@@ -5,13 +5,13 @@
 
 vgm_chip::vgm_chip(size_t num_channels, bool stereo_channels) : channels(num_channels), stereo(stereo_channels) {
     if(stereo_channels) {
-        channels_out_left = _channels_out_left = new float[num_channels];
-        channels_out_right = _channels_out_right = new float[num_channels];
-    } else channels_out_left = channels_out_right = _channels_out = _channels_out_left = _channels_out_right = new float[num_channels];
-    channels_pan = _channels_pan = new pff[num_channels];
+        channels_out_left = _channels_out_left = new sample_t[num_channels];
+        channels_out_right = _channels_out_right = new sample_t[num_channels];
+    } else channels_out_left = channels_out_right = _channels_out = _channels_out_left = _channels_out_right = new sample_t[num_channels];
+    channels_pan = _channels_pan = new stereo_volume_t[num_channels];
     for(size_t i = 0; i < num_channels; i++) {
         _channels_out_left[i] = _channels_out_right[i] = 0;
-        _channels_pan[i] = std::make_pair<float, float>(1, 1);
+        _channels_pan[i] = std::make_pair(1, 1);
     }
 }
 
@@ -24,8 +24,8 @@ vgm_chip::~vgm_chip() {
     delete _channels_pan;
 }
 
-pff vgm_chip::mix_channels() {
-    float left = 0, right = 0;
+stereo_sample_t vgm_chip::mix_channels() {
+    sample_t left = 0, right = 0;
     for(size_t i = 0; i < channels; i++) {
         left += _channels_out_left[i] * _channels_pan[i].first;
         right += _channels_out_right[i] * _channels_pan[i].second;

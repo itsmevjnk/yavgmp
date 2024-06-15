@@ -37,9 +37,9 @@ void emu2149_wrapper::update_chip(int idx) {
     PSG_calc(_chips[idx]);
     for(int i = 0; i < 3; i++)
 #ifdef EMU2149_USE_BUILTIN_RATECONV
-        _channels_out[idx * 3 + i] = (float)_chips[idx]->ch_out[i] / (0xFF << 4);
+        _channels_out[idx * 3 + i] = (sample_t)_chips[idx]->ch_out[i] / (0xFF << 4);
 #else
-        put_sample(idx * 3 + i, (float)_chips[idx]->ch_out[i] / (0xFF << 4) - 0.5);
+        put_sample(idx * 3 + i, (sample_t)_chips[idx]->ch_out[i] / (0xFF << 4) - 0.5);
 #endif
 }
 

@@ -84,7 +84,7 @@ public:
     const size_t& played_samples = _played_samples;
     const size_t& played_loops = _played_loops;
 
-    pif get_track_position() const;
+    time_ms_t get_track_position() const;
 
     const bool& play_ended = _play_ended;
 
@@ -96,8 +96,8 @@ public:
     const std::vector<vgm_dblock_t const*>& data_blocks = _data_blocks;
     const std::vector<vgm_dblock_t const*>& decomp_tables = _decomp_tables;
 
-    static const float chip_volumes[];
-    pff mix_outputs();
+    static const volume_t chip_volumes[];
+    stereo_sample_t mix_outputs();
 private:
     void init_stub(bool read_all);
     

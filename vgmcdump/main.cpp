@@ -92,7 +92,7 @@ FILE** outputs[sizeof(chips) / sizeof(chips[0])]; // list of arrays to file hand
 #define ENDIAN_FLIP_32(x)					((((x) & 0x000000FF) << 24) | (((x) & 0x0000FF00) << 8) | (((x) & 0x00FF0000) >> 8) | (((x) & 0xFF000000) >> 24))
 
 bool wav_float = true;
-void write_sample(float samp, FILE* fp) {
+void write_sample(sample_t samp, FILE* fp) {
 	if(wav_float) {
 		/* write sample as-is */
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN_
@@ -126,7 +126,7 @@ bool new_sample_handler(vgm_parser* parser) {
 			}
 
 			if(outputs[i][num_channels]) {
-				pff out = parser->chips_array[i]->mix_channels();
+				stereo_sample_t out = parser->chips_array[i]->mix_channels();
 				write_sample(out.first, outputs[i][num_channels]);
 				write_sample(out.second, outputs[i][num_channels]);
 			}
@@ -134,7 +134,7 @@ bool new_sample_handler(vgm_parser* parser) {
 	}
 
 	if(mixed_output) {
-		pff out = parser->mix_outputs();
+		stereo_sample_t out = parser->mix_outputs();
 		write_sample(out.first, mixed_output);
 		write_sample(out.second, mixed_output);
 	}

@@ -24,7 +24,7 @@ int sample_cb(const void* in, void* out, ulong frames, const PaStreamCallbackTim
 			// cb_data->pa->stop(); // no more data
 			return paComplete;
 		} 
-		pff parser_out = vgm->mix_outputs();
+		stereo_sample_t parser_out = vgm->mix_outputs();
 		*outbuf++ = parser_out.first;
 		*outbuf++ = parser_out.second;
 		
@@ -68,10 +68,10 @@ int main(int argc, char* argv[]) {
 	Pa a(sample_cb, 0, 2, 44100, 0, &vgm);
 	a.start();
 
-	pif total_dur = vgm.header.get_total_duration();
+	time_ms_t total_dur = vgm.header.get_total_duration();
 	printf("playing VGM file: %s (%02d:%06.3f%s)\n", infile, total_dur.first, total_dur.second, vgm.header.fields.loop_samples ? ", looped" : "");
 	while(1) {
-		pif pos = vgm.get_track_position();
+		time_ms_t pos = vgm.get_track_position();
 		printf("position: %02d:%06.3f\r", pos.first, pos.second);
 	}
 

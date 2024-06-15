@@ -122,6 +122,6 @@ bool vgm_parser::parse_gd3() {
     return true;
 }
 
-pif vgm_parser::get_track_position() const {
-    return vgm_header::samples_to_min_sec(_track_pos);
+time_ms_t vgm_parser::get_track_position() const {
+    return vgm_samp_to_minsec(_track_pos);
 }

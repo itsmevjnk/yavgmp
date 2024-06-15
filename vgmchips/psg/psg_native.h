@@ -7,8 +7,8 @@
 /* single chip emulator */
 class psg_emu {
 public:
-    psg_emu(size_t clock, float* output_buf, pff* pan_buf, size_t lfsr_width = 16, size_t lfsr_pattern = 0x0009, bool neg_output = false, bool no_gg_stereo = false, bool xnor_noise = false);
-    psg_emu(const vgm_header_t& header, float* output_buf, pff* pan_buf);
+    psg_emu(size_t clock, sample_t* output_buf, stereo_volume_t* pan_buf, size_t lfsr_width = 16, size_t lfsr_pattern = 0x0009, bool neg_output = false, bool no_gg_stereo = false, bool xnor_noise = false);
+    psg_emu(const vgm_header_t& header, sample_t* output_buf, stereo_volume_t* pan_buf);
 
     const bool& quality = _quality;
     void set_quality(bool q);
@@ -49,8 +49,8 @@ private:
     uint8_t _addr;
     // size_t _stereo = 0xFF;
 
-    float* _channels_out;
-    pff* _channels_pan;
+    sample_t* _channels_out;
+    stereo_volume_t* _channels_pan;
 
     void internal_refresh();
     void update_output();

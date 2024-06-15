@@ -19,8 +19,8 @@ static double _windowed_sinc(int lw, double x) {
 rateconv::rateconv(int num_channels, float f_in, float f_out) : channels(num_channels), _f_ratio(f_in / f_out) {
     _lw = RATECONV_LW_MIN; while((float)_lw < _f_ratio) _lw += 2; // find suitable window size so that we can always have all new samples in our buffer
 
-    _buf = new float[num_channels * _lw];
-    memset(_buf, 0, num_channels * _lw * sizeof(float));
+    _buf = new sample_t[num_channels * _lw];
+    memset(_buf, 0, num_channels * _lw * sizeof(sample_t));
     
     /* populate sinc lookup table */
     _sinctab = new float[RATECONV_SINC_RESO * _lw / 2];
@@ -39,9 +39,9 @@ rateconv::~rateconv() {
     delete _buf;
 }
 
-void rateconv::put_sample(int channel, float val) {
-    float* buf = &_buf[channel * _lw];
-    memmove(buf, &buf[1], sizeof(float) * (_lw - 1));
+void rateconv::put_sample(int channel, sample_t val) {
+    sample_t* buf = &_buf[channel * _lw];
+    memmove(buf, &buf[1], sizeof(sample_t) * (_lw - 1));
     buf[_lw - 1] = val;
 }
 
@@ -59,9 +59,9 @@ int rateconv::advance_timer() {
     return num_clocks;
 }
 
-float rateconv::get_sample(int channel) {
-    float* buf = &_buf[channel * _lw];
-    float samp = 0;
+sample_t rateconv::get_sample(int channel) {
+    sample_t* buf = &_buf[channel * _lw];
+    sample_t samp = 0;
     for(int k = 0; k < _lw; k++) {
         double x = ((double)k - (_lw / 2 - 1)) - _timer;
         samp += buf[k] * lookup_sinc_table(_sinctab, _lw, x);

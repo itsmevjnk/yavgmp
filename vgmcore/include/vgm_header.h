@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdint.h>
+#include <vgm_types.h>
 #include <iostream>
 #include <functional>
 
@@ -133,8 +133,6 @@ typedef struct {
 } vgm_header_t;
 #pragma pack(pop)
 
-typedef std::pair<int, float> pif;
-
 class vgm_header {
 public:
 	const vgm_header_t& fields = _header;
@@ -150,8 +148,8 @@ public:
 	vgm_header(std::function<bool(uint8_t* dest_buf, size_t offset, size_t len)> read_cb);
 
 	bool is_version(int maj, int min) const;
-	pif get_total_duration() const;
-	pif get_loop_duration() const;
+	time_ms_t get_total_duration() const;
+	time_ms_t get_loop_duration() const;
 
 	float get_volume_factor() const;
 
@@ -160,8 +158,6 @@ public:
 	uint16_t get_c352_clkdiv() const;
 
 	size_t get_data_len() const;
-
-	static pif samples_to_min_sec(size_t samples);
 private:
 	vgm_header_t _header;
 	size_t _header_len = 0x40;

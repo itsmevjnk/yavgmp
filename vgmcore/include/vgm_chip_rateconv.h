@@ -12,7 +12,7 @@ public:
 
     virtual void clock() = 0;
 
-    virtual void put_sample(size_t channel, float val, bool side = false);
+    virtual void put_sample(size_t channel, sample_t val, bool side = false);
 private:
     rateconv* _rconv;
 };

@@ -1,10 +1,7 @@
 #pragma once
 
-#include <stddef.h>
-#include <stdint.h>
+#include <vgm_types.h>
 #include <vector>
-
-typedef std::pair<float, float> pff; // abbreviation
 
 /* chip IDs */
 enum vgm_chip_ids {
@@ -63,12 +60,12 @@ public:
     virtual void write_rom(uintptr_t chip, size_t total_size, uintptr_t base_addr, const uint8_t* data, size_t len, size_t type = 0);
     virtual void write_ram(uintptr_t chip, uintptr_t base_addr, const uint8_t* data, size_t len);
     const size_t channels; // number of channels
-    const float* channels_out_left, *channels_out_right; // channel outputs
-    const pff* channels_pan; // channel levels per output (left, right) - for mixing
+    const sample_t* channels_out_left, *channels_out_right; // channel outputs
+    const stereo_volume_t* channels_pan; // channel levels per output (left, right) - for mixing
     const bool stereo; // set if channels are stereo
-    virtual pff mix_channels(); // mix channels into stereo outputs (NOTE: chips can provide their own implementations too - eg. OPN2 with its TDM mixing)
+    virtual stereo_sample_t mix_channels(); // mix channels into stereo outputs (NOTE: chips can provide their own implementations too - eg. OPN2 with its TDM mixing)
 protected:
-    float* _channels_out = nullptr; // only set if stereo_channels = false
-    float* _channels_out_left = nullptr, *_channels_out_right = nullptr; // set to _channels_out if stereo_channels = false; their own buffers otherwise (and _channels_out would be null)
-    pff* _channels_pan;
+    sample_t* _channels_out = nullptr; // only set if stereo_channels = false
+    sample_t* _channels_out_left = nullptr, *_channels_out_right = nullptr; // set to _channels_out if stereo_channels = false; their own buffers otherwise (and _channels_out would be null)
+    stereo_volume_t* _channels_pan;
 };

@@ -222,19 +222,14 @@ vgm_header::vgm_header() {
 
 }
 
-pif vgm_header::samples_to_min_sec(size_t samples) {
-	float dur_seconds = samples / 44100.0;
-	int min = (int)dur_seconds / 60;
-	float sec = dur_seconds - min * 60;
-	return std::make_pair(min, sec);
+
+
+time_ms_t vgm_header::get_total_duration() const {
+	return vgm_samp_to_minsec(fields.total_samples);
 }
 
-pif vgm_header::get_total_duration() const {
-	return vgm_header::samples_to_min_sec(fields.total_samples);
-}
-
-pif vgm_header::get_loop_duration() const {
-	return vgm_header::samples_to_min_sec(fields.loop_samples);
+time_ms_t vgm_header::get_loop_duration() const {
+	return vgm_samp_to_minsec(fields.loop_samples);
 }
 
 float vgm_header::get_volume_factor() const {

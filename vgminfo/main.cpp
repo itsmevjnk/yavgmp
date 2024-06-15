@@ -14,10 +14,10 @@ int main(int argc, char* argv[]) {
 	printf("%s : %u bytes uncompressed\n\n", argv[argc - 1], vgm.header.fields.eof_offset);
 
 	printf("Version               : %u.%02u\n", vgm.header.fields.version_maj, vgm.header.fields.version_min);
-	pif total_dur = vgm.header.get_total_duration();
-	printf("Total samples         : %u\t(%02u:%05.3f)\t@ 0x%x\n", vgm.header.fields.total_samples, total_dur.first, total_dur.second, vgm.header.fields.data_offset);
-	pif loop_dur = vgm.header.get_loop_duration();
-	printf("Loop samples          : %u\t(%02u:%05.3f)\t@ 0x%x\n", vgm.header.fields.loop_samples, loop_dur.first, loop_dur.second, vgm.header.fields.loop_offset);
+	time_ms_t total_dur = vgm.header.get_total_duration();
+	printf("Total samples         : %u\t(%02u:%06.3f)\t@ 0x%x\n", vgm.header.fields.total_samples, total_dur.first, total_dur.second, vgm.header.fields.data_offset);
+	time_ms_t loop_dur = vgm.header.get_loop_duration();
+	printf("Loop samples          : %u\t(%02u:%06.3f)\t@ 0x%x\n", vgm.header.fields.loop_samples, loop_dur.first, loop_dur.second, vgm.header.fields.loop_offset);
 	printf("GD3 offset            : 0x%x\n", vgm.header.fields.gd3_offset);
 	printf("Extra header offset   : 0x%x\n", vgm.header.fields.exthdr_offset);
 	printf("Recording rate        : %u Hz\n", vgm.header.fields.rate);

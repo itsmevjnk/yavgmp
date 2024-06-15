@@ -31,7 +31,7 @@ void opn2_wrapper::update_chip(int idx) {
     int channel = -1;
 
     ym3438_t* chip = _chips[idx];
-    float samples[6][2] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};
+    sample_t samples[6][2] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};
     int sample_cnts[6] = {0, 0, 0, 0, 0, 0};
     for(int i = 0; i < 24; i++) {
         switch(chip->cycles >> 2) {
@@ -48,7 +48,7 @@ void opn2_wrapper::update_chip(int idx) {
         
         if(channel >= 0) {
             if(!mute) {
-                float left = buf[0] / 256.0, right = buf[1] / 256.0; // ym3438.h says MOL and MOR are 9-bit signed values
+                sample_t left = buf[0] / 256.0, right = buf[1] / 256.0; // ym3438.h says MOL and MOR are 9-bit signed values
                 samples[channel][0] += left;
                 samples[channel][1] += right;
                 _mix_rconv->put_sample((idx << 1), left * _channels_pan[(idx * 6) + channel].first);
@@ -108,6 +108,6 @@ void opn2_wrapper::install(vgm_parser& parser) {
     parser.chips.opn2 = new opn2_wrapper(parser.header.fields);
 }
 
-pff opn2_wrapper::mix_channels() {
+stereo_sample_t opn2_wrapper::mix_channels() {
     return _mix_output;
 }

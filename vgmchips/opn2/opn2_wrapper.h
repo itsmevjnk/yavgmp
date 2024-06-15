@@ -12,13 +12,13 @@ public:
 
     virtual void clock();
     virtual void write(uintptr_t chip, uintptr_t port, uintptr_t addr_reg, uintptr_t val);
-    virtual pff mix_channels();
+    virtual stereo_sample_t mix_channels();
     
     static void install(vgm_parser& parser); // create and plant ourselves in the specified parser object
 private:
     const bool _dual_chip;
     rateconv* _mix_rconv; // for mixing channels (since OPN2 uses time-division multiplexing)
-    pff _mix_output; // mixed output (written by clock(), to be returned by mix_channels())
+    stereo_sample_t _mix_output; // mixed output (written by clock(), to be returned by mix_channels())
     
     ym3438_t* _chips[2] = {nullptr, nullptr}; // chips
 
