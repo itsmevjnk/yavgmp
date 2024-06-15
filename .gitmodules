@@ -16,3 +16,6 @@
 [submodule "vgmchips/scc/emu2212"]
 	path = vgmchips/scc/emu2212
 	url = https://github.com/digital-sound-antiques/emu2212
+[submodule "vgmplay/pa-wrapper"]
+	path = vgmplay/pa-wrapper
+	url = https://github.com/orazdow/PortAudio-Wrapper

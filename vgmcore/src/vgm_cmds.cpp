@@ -1141,9 +1141,10 @@ bool vgm_parser::parse_until_next_sample(size_t n) {
             /* no pending samples - parse next command */
             if(!parse_next()) break;
         } else {
-            /* there's pending samples - run through them all before continuing */
-            samples += _pending_samples;
-            if(!process_wait(_pending_samples)) return false;
+            /* there's pending samples - run through them all (or as many of them as possible) before continuing */
+            size_t num_samples = (n > _pending_samples) ? _pending_samples : n;
+            samples += num_samples;
+            if(!process_wait(num_samples)) return false;
         }
     }
     return !_play_ended;

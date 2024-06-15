@@ -84,6 +84,8 @@ public:
     const size_t& played_samples = _played_samples;
     const size_t& played_loops = _played_loops;
 
+    pif get_track_position() const;
+
     const bool& play_ended = _play_ended;
 
     bool process_wait(size_t n = 1); // process pending wait up to n samples

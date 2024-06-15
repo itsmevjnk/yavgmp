@@ -72,6 +72,7 @@ void vgm_parser::init(std::istream& stream, bool read_all) {
 void vgm_parser::init(const char* path, bool decompress_all) {
     /* check if we need to inflate (decompress) the file at all */
     FILE* file = fopen(path, "r");
+    if(!file) throw std::runtime_error("cannot open VGM file");
     uint16_t sig; fread(&sig, 2, 1, file);
     fclose(file);
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
@@ -119,4 +120,8 @@ bool vgm_parser::parse_gd3() {
     populate_cache(); // read the rest of the file into cache
     _gd3 = new gd3(&_data_buf[header.fields.gd3_offset - header.fields.data_offset], header.fields.eof_offset - header.fields.gd3_offset);
     return true;
+}
+
+pif vgm_parser::get_track_position() const {
+    return vgm_header::samples_to_min_sec(_track_pos);
 }

@@ -222,19 +222,19 @@ vgm_header::vgm_header() {
 
 }
 
-std::pair<int, float> vgm_header::samples_to_min_sec(uint32_t samples) const {
+pif vgm_header::samples_to_min_sec(size_t samples) {
 	float dur_seconds = samples / 44100.0;
 	int min = (int)dur_seconds / 60;
 	float sec = dur_seconds - min * 60;
 	return std::make_pair(min, sec);
 }
 
-std::pair<int, float> vgm_header::get_total_duration() const {
-	return samples_to_min_sec(fields.total_samples);
+pif vgm_header::get_total_duration() const {
+	return vgm_header::samples_to_min_sec(fields.total_samples);
 }
 
-std::pair<int, float> vgm_header::get_loop_duration() const {
-	return samples_to_min_sec(fields.loop_samples);
+pif vgm_header::get_loop_duration() const {
+	return vgm_header::samples_to_min_sec(fields.loop_samples);
 }
 
 float vgm_header::get_volume_factor() const {
