@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include <fstream>
 #include <vgm_parser.h>
@@ -72,12 +73,12 @@ uint8_t wav_header[] = {
 	/* data format chunk */
 	/* 0x0C */ 'f', 'm', 't', ' ',
 	/* 0x10 */ 0x10, 0x00, 0x00, 0x00, // chunk size minus 8 (16)
-	/* 0x14 */ 0x03, 0x00, // float32 format
+	/* 0x14 */ 0x00, 0x00, // 1 = signed 16-bit integer, 3 = 32-bit float
 	/* 0x16 */ 0x02, 0x00, // stereo = 2, mono = 1
 	/* 0x18 */ 0x44, 0xAC, 0x00, 0x00, // sample rate (44100 Hz)
-	/* 0x1C */ 0x20, 0x62, 0x05, 0x00, // bytes to read per second (44100 * 4 * 1 = 10 B1 02 00 if mono, or 44100 * 4 * 2 = 20 62 05 00 if stereo)
-	/* 0x20 */ 0x08, 0x00, // bytes per block (4 if mono, or 8 if stereo)
-	/* 0x22 */ 0x20, 0x00, // bits per sample (32)
+	/* 0x1C */ 0x00, 0x00, 0x00, 0x00, // bytes to read per second (44100 * 4 * 1 = 10 B1 02 00 if mono, or 44100 * 4 * 2 = 20 62 05 00 if stereo)
+	/* 0x20 */ 0x00, 0x00, // bytes per block (2/4 if mono, or 4/8 if stereo)
+	/* 0x22 */ 0x00, 0x00, // bits per sample (16 if integer, or 32 if float)
 
 	/* data chunk */
 	/* 0x24 */ 'd', 'a', 't', 'a',
@@ -87,11 +88,31 @@ uint8_t wav_header[] = {
 FILE* mixed_output; // final mixed output file
 FILE** outputs[sizeof(chips) / sizeof(chips[0])]; // list of arrays to file handlers (one file per channel)
 
+#define ENDIAN_FLIP_16(x)					((((x) & 0x00FF) << 8) | (((x) & 0xFF00) >> 8))
 #define ENDIAN_FLIP_32(x)					((((x) & 0x000000FF) << 24) | (((x) & 0x0000FF00) << 8) | (((x) & 0x00FF0000) >> 8) | (((x) & 0xFF000000) >> 24))
+
+bool wav_float = true;
+void write_sample(float samp, FILE* fp) {
+	if(wav_float) {
+		/* write sample as-is */
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN_
+		uint32_t* samp_int = *((uint32_t*)&samp);
+		*samp_int = ENDIAN_FLIP_32(*samp_int); // convert to little endian
+#endif
+		fwrite(&samp, 4, 1, fp);		
+	} else {
+		/* convert to integer first */
+		if(samp > 1.0) samp = 1.0; else if(samp < -1.0) samp = -1.0; // clamp sample to -1.0..1.0
+		int16_t samp_int = samp * 32767;
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN_
+		samp_int = ENDIAN_FLIP_16(samp_int); // convert to little endian
+#endif		
+		fwrite(&samp_int, 2, 1, fp);
+	}
+}
 
 /* actual dump function */
 bool new_sample_handler(vgm_parser* parser) {
-	float samp_float; uint32_t* samp = (uint32_t*)&samp_float; // temp variable for sample and its uint32_t cast
 	for(int i = 0; i < sizeof(outputs) / sizeof(outputs[0]); i++) {
 		if(parser->chips_array[i]) {
 			/* dump samples from chip */
@@ -99,59 +120,71 @@ bool new_sample_handler(vgm_parser* parser) {
 			
 			for(int j = 0; j < num_channels; j++) {
 				if(outputs[i][j]) {
-					samp_float = parser->chips_array[i]->channels_out_left[j] * parser->chips_array[i]->channels_pan[j].first;
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-					*samp = ENDIAN_FLIP_32(*samp); // convert to little endian
-#endif
-					fwrite(samp, 4, 1, outputs[i][j]);
-					samp_float = parser->chips_array[i]->channels_out_right[j] * parser->chips_array[i]->channels_pan[j].second; 
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-					*samp = ENDIAN_FLIP_32(*samp);
-#endif						
-					fwrite(samp, 4, 1, outputs[i][j]);
+					write_sample(parser->chips_array[i]->channels_out_left[j] * parser->chips_array[i]->channels_pan[j].first, outputs[i][j]);
+					write_sample(parser->chips_array[i]->channels_out_right[j] * parser->chips_array[i]->channels_pan[j].second, outputs[i][j]);
 				}
 			}
 
 			if(outputs[i][num_channels]) {
 				pff out = parser->chips_array[i]->mix_channels();
-				samp_float = out.first;
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-				*samp = ENDIAN_FLIP_32(*samp); // convert to little endian
-#endif
-				fwrite(samp, 4, 1, outputs[i][num_channels]);
-				samp_float = out.second;
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-				*samp = ENDIAN_FLIP_32(*samp);
-#endif						
-				fwrite(samp, 4, 1, outputs[i][num_channels]);
+				write_sample(out.first, outputs[i][num_channels]);
+				write_sample(out.second, outputs[i][num_channels]);
 			}
 		}
 	}
 
 	if(mixed_output) {
 		pff out = parser->mix_outputs();
-		samp_float = out.first;
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-		*samp = ENDIAN_FLIP_32(*samp); // convert to little endian
-#endif
-		fwrite(samp, 4, 1, mixed_output);
-		samp_float = out.second;
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-		*samp = ENDIAN_FLIP_32(*samp);
-#endif						
-		fwrite(samp, 4, 1, mixed_output);
+		write_sample(out.first, mixed_output);
+		write_sample(out.second, mixed_output);
 	}
 
 	return true; // continue playing
 }
 
+char output_prefix[257]; // output file path prefix (defaults to input path)
+
 int main(int argc, char* argv[]) {
-	if(argc != 2) {
-		printf("vgmcdump: invalid number of arguments given\n");
-		return 1;
+	opterr = 0;
+	int c;
+	output_prefix[0] = '\0'; // make it an empty string
+	while((c = getopt(argc, argv, "iho:")) != -1) {
+		switch(c) {
+			case 'i':
+				wav_float = false;
+				break;
+			case 'h':
+				printf("vgmcdump - dump channel/chip outputs from VGM file\n");
+				printf("usage: vgmcdump [-i] [-o PREFIX] VGM_FILE\n");
+				printf("optional arguments:\n");
+				printf("\t-i\t\toutput 16-bit signed integer WAV files instead of 32-bit floating point\n");
+				printf("\t-o PREFIX\tuse PREFIX as prefix for output file paths\n");
+				return 0;
+			case 'o':
+				strncpy(output_prefix, optarg, 257);
+				break;
+			case '?':
+				if(optopt == 'o')
+					fprintf(stderr, "vgmcdump: option -%c requires an argument\n", optopt);
+				else if(isprint(optopt))
+					fprintf(stderr, "vgmcdump: unknown option -%c\n", optopt);
+				else
+					fprintf(stderr, "vgmcdump: unknown character 0x%x\n", optopt);
+				return 1;
+			default:
+				abort();
+		}		
 	}
 
-	vgm_parser vgm(argv[argc - 1], false); // open file
+	if(optind == argc) {
+		fprintf(stderr, "vgmcdump: no input file given\n");
+		return 1;
+	}
+	const char* infile = argv[optind];
+	if(!output_prefix[0]) strncpy(output_prefix, infile, 257);
+	output_prefix[256] = '\0';
+
+	vgm_parser vgm(infile, false); // open file
 
 	/* install chip emulators */
 #ifdef PSG_USE_NATIVE
@@ -175,18 +208,26 @@ int main(int argc, char* argv[]) {
 
 play_section:
 	/* calculate fields to be put into the WAV header */
-	uint32_t data_size = 4 * section_samples * 2;
+	uint32_t data_size = (wav_float ? 4 : 2) * section_samples * 2;
 	uint32_t file_size = data_size + 32;
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 	data_size = ENDIAN_FLIP_32(data_size);
 	file_size = ENDIAN_FLIP_32(file_size);
 #endif
+	wav_header[0x14] = wav_float ? 3 : 1;
+	wav_header[0x20] = wav_float ? 8 : 4;
+	wav_header[0x22] = wav_float ? 32 : 16;
 	*((uint32_t*)&wav_header[0x04]) = file_size;
 	*((uint32_t*)&wav_header[0x28]) = data_size;
+	uint32_t bytes_per_second = wav_header[0x20] * 44100;
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	bytes_per_second = ENDIAN_FLIP_32(bytes_per_second);
+#endif
+	*((uint32_t*)&wav_header[0x1C]) = bytes_per_second;
 
 	/* open output files */
 	char path_buf[257];
-	snprintf(path_buf, 257, "%s_%d_mixed.wav", argv[argc - 1], section);
+	snprintf(path_buf, 257, "%s_%d_mixed.wav", output_prefix, section);
 	mixed_output = fopen(path_buf, "wb");
 	if(!mixed_output) printf("cannot open %s\n", path_buf);
 	else {
@@ -203,7 +244,7 @@ play_section:
 			}
 			memset(outputs[i], 0, (num_channels + 1) * sizeof(FILE*)); // to be sure
 			for(int j = 0; j < num_channels; j++) {
-				snprintf(path_buf, 257, "%s_%d_%s_%d.wav", argv[argc - 1], section, chips[i], j);
+				snprintf(path_buf, 257, "%s_%d_%s_%d.wav", output_prefix, section, chips[i], j);
 				outputs[i][j] = fopen(path_buf, "wb");
 				if(!outputs[i][j]) printf("cannot open %s\n", path_buf);
 				else {
@@ -211,7 +252,7 @@ play_section:
 					fwrite(wav_header, sizeof(wav_header), 1, outputs[i][j]); // write header
 				}
 			}
-			snprintf(path_buf, 257, "%s_%d_%s_mixed.wav", argv[argc - 1], section, chips[i]);
+			snprintf(path_buf, 257, "%s_%d_%s_mixed.wav", output_prefix, section, chips[i]);
 			outputs[i][num_channels] = fopen(path_buf, "wb");
 			if(!outputs[i][num_channels]) printf("cannot open %s\n", path_buf);
 			else {
@@ -225,7 +266,7 @@ play_section:
 	size_t start_pos = vgm.played_samples;
 	while(vgm.played_samples - start_pos < section_samples) {
 		// printf("playing sample %lu/%u\n", vgm.played_samples, vgm.header.fields.total_samples);
-		if(!vgm.parse_next()) break; // premature end(?)
+		if(!vgm.parse_until_next_sample()) break; // premature end(?)
 	}
 
 	/* wrap up */

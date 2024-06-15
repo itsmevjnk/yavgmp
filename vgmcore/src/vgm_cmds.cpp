@@ -122,17 +122,22 @@ void vgm_parser::do_opl3_write(uint8_t cmd) {
     if(chips.opl3) chips.opl3->write(chip, port, reg, data);
 } // 0x5E/5F
 
-void vgm_parser::wait(size_t n) {
-    for(size_t samp = 0; samp < n; samp++, _track_pos++, _played_samples++) {
+bool vgm_parser::process_wait(size_t n) {
+    if(n > _pending_samples) n = _pending_samples;
+    for(size_t samp = 0; samp < n; samp++, _pending_samples--, _track_pos++, _played_samples++) {
         /* iterate through our list of chips to invoke next_sample() */
         for(size_t i = 0; i < sizeof(chips) / sizeof(chips_array[0]); i++) {
             if(chips_array[i]) chips_array[i]->next_sample();
         }
 
         if(on_new_sample) {
-            if(!on_new_sample(this)) return; // stop processing
+            if(!on_new_sample(this)) {
+                _pending_samples = 0;
+                return false; // stop processing
+            }
         }
     }
+    return true;
 }
 
 void vgm_parser::do_wait(uint8_t cmd) {
@@ -155,7 +160,7 @@ void vgm_parser::do_wait(uint8_t cmd) {
     }
     if(cmd_log) fprintf(cmd_log, "\t\twait %u samples\n", n);
 
-    wait(n);
+    _pending_samples = n;
 } // 0x61/62/63/7n
 
 void vgm_parser::do_end(uint8_t cmd) {
@@ -503,7 +508,7 @@ void vgm_parser::do_opn2_bank_write(uint8_t cmd) {
     }
 
     if(chips.opn2) chips.opn2->write(0, 0, 0x2A, dblock->data.uncompressed[_opn2_bank_offset++]);
-    wait(wait_samples);
+    _pending_samples = wait_samples;
 } // 0x8n
 
 void vgm_parser::do_dac_stream_setup(uint8_t cmd) {
@@ -828,6 +833,12 @@ void vgm_parser::do_rsvd_4(uint8_t cmd) {
 } // 0xE2..FF
 
 bool vgm_parser::parse_next() {
+    if(_pending_samples) {
+        // _pending_samples--;
+        if(!process_wait()) return false;
+        return true;
+    }
+
     if(!_play_ended) {
         int cmd = read_data();
         if(cmd == EOF) {
@@ -1120,5 +1131,20 @@ bool vgm_parser::parse_next() {
         }
     }
 
+    return !_play_ended;
+}
+
+bool vgm_parser::parse_until_next_sample(size_t n) {
+    size_t samples = 0;
+    while(samples < n) {
+        if(!_pending_samples) {
+            /* no pending samples - parse next command */
+            if(!parse_next()) break;
+        } else {
+            /* there's pending samples - run through them all before continuing */
+            samples += _pending_samples;
+            if(!process_wait(_pending_samples)) return false;
+        }
+    }
     return !_play_ended;
 }

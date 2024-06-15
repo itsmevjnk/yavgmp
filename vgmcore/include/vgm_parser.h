@@ -86,7 +86,10 @@ public:
 
     const bool& play_ended = _play_ended;
 
-    bool parse_next(); // parse next command, returns inverse of play_ended value (i.e. whether there's still more stuff to be played)
+    bool process_wait(size_t n = 1); // process pending wait up to n samples
+    bool parse_next(); // parse next command or get next sample, returns inverse of play_ended value (i.e. whether there's still more stuff to be played)
+    bool parse_until_next_sample(size_t n = 1); // parse until the next n samples has been played
+    const int& pending_samples = _pending_samples;
 
     const std::vector<vgm_dblock_t const*>& data_blocks = _data_blocks;
     const std::vector<vgm_dblock_t const*>& decomp_tables = _decomp_tables;
@@ -110,6 +113,8 @@ private:
 
     size_t _played_samples = 0; // total number of samples played
     size_t _played_loops = 0; // total number of loops played
+    
+    int _pending_samples = 0; // number of samples to wait before processing next command
 
     bool _play_ended = false; // set when there's no more stuff to be played in this file
 
@@ -189,7 +194,7 @@ private:
     void do_rsvd_3(uint8_t cmd); // 0xC9..CF/D7..DF
     void do_rsvd_4(uint8_t cmd); // 0xE2..FF
 
-    void wait(size_t n);
+    // void wait(size_t n);
 
     size_t _opn2_bank_offset = 0; // for 0x8n and 0xE0
 };
