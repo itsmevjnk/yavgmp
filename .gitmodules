@@ -19,3 +19,6 @@
 [submodule "vgmplay/pa-wrapper"]
 	path = vgmplay/pa-wrapper
 	url = https://github.com/orazdow/PortAudio-Wrapper
+[submodule "vgmplay/readerwriterqueue"]
+	path = vgmplay/readerwriterqueue
+	url = https://github.com/cameron314/readerwriterqueue

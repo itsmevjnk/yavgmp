@@ -17,10 +17,12 @@ target_link_libraries(pa_wrapper PUBLIC portaudio)
 
 add_executable(
     vgmplay
-    main.cpp
+    main.cpp player.cpp parser.cpp
 )
 
 target_link_libraries(vgmplay PUBLIC pthread)
 target_link_libraries(vgmplay PUBLIC vgmcore)
 target_link_libraries(vgmplay PUBLIC pa_wrapper)
 
+add_subdirectory(readerwriterqueue)
+target_link_libraries(vgmplay PUBLIC readerwriterqueue)
