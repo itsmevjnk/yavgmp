@@ -36,8 +36,8 @@ void rf5c::write_reg(uint32_t addr, uint8_t data) {
                 // channel.pmul_l = channel.env * channel.pan_l;
                 // channel.pmul_r = channel.env * channel.pan_r;
                 // printf("ch%u pan=0x%x\n", _channel_bank, data);
-                _channels_pan[_channel_bank].first = (data & 0xF) / 15.0;
-                _channels_pan[_channel_bank].second = (data >> 4) / 15.0;
+                _channels_pan[_channel_bank].left = (data & 0xF) / 15.0;
+                _channels_pan[_channel_bank].right = (data >> 4) / 15.0;
                 break;
             case 0x02: // freq delta (LSB)
                 channel.freq_delta = (channel.freq_delta & 0xFF00) | data;
@@ -83,7 +83,7 @@ rf5c::rf5c(uint32_t clock, bool rf164, bool ramax) : _out_mask(rf164 ? ~0x00 : ~
     memset(_channels, 0, sizeof(_channels));
     memset(_channels_out, 0, sizeof(_channels_out));
     memset(ram, 0, ram_size * sizeof(uint8_t));
-    for(int i = 0; i < 8; i++) _channels_pan[i].first = _channels_pan[i].second = 0; // mute all channels first
+    for(int i = 0; i < 8; i++) _channels_pan[i].left = _channels_pan[i].right = 0; // mute all channels first
 }
 
 rf5c::~rf5c() {

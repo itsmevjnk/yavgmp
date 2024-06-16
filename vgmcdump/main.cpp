@@ -120,23 +120,23 @@ bool new_sample_handler(vgm_parser* parser) {
 			
 			for(int j = 0; j < num_channels; j++) {
 				if(outputs[i][j]) {
-					write_sample(parser->chips_array[i]->channels_out_left[j] * parser->chips_array[i]->channels_pan[j].first, outputs[i][j]);
-					write_sample(parser->chips_array[i]->channels_out_right[j] * parser->chips_array[i]->channels_pan[j].second, outputs[i][j]);
+					write_sample(parser->chips_array[i]->channels_out_left[j] * parser->chips_array[i]->channels_pan[j].left, outputs[i][j]);
+					write_sample(parser->chips_array[i]->channels_out_right[j] * parser->chips_array[i]->channels_pan[j].right, outputs[i][j]);
 				}
 			}
 
 			if(outputs[i][num_channels]) {
 				stereo_sample_t out = parser->chips_array[i]->mix_channels();
-				write_sample(out.first, outputs[i][num_channels]);
-				write_sample(out.second, outputs[i][num_channels]);
+				write_sample(out.left, outputs[i][num_channels]);
+				write_sample(out.right, outputs[i][num_channels]);
 			}
 		}
 	}
 
 	if(mixed_output) {
 		stereo_sample_t out = parser->mix_outputs();
-		write_sample(out.first, mixed_output);
-		write_sample(out.second, mixed_output);
+		write_sample(out.left, mixed_output);
+		write_sample(out.right, mixed_output);
 	}
 
 	return true; // continue playing

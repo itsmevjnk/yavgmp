@@ -46,8 +46,8 @@ void psg_wrapper::write(uintptr_t chip, uintptr_t port, uintptr_t addr_reg, uint
         /* intercept GG write to use our own handler */
         int base_ch = (chip) ? 4 : 0;
         for(size_t ch = 0; ch < 4; ch++) {
-            _channels_pan[base_ch + ch].first = (val & (1 << (4 + ch))) ? 1.0 : 0.0;
-            _channels_pan[base_ch + ch].second = (val & (1 << ch)) ? 1.0 : 0.0;
+            _channels_pan[base_ch + ch].left = (val & (1 << (4 + ch))) ? 1.0 : 0.0;
+            _channels_pan[base_ch + ch].right = (val & (1 << ch)) ? 1.0 : 0.0;
         }
     }
 }

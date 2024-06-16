@@ -51,8 +51,8 @@ void opn2_wrapper::update_chip(int idx) {
                 sample_t left = buf[0] / 256.0, right = buf[1] / 256.0; // ym3438.h says MOL and MOR are 9-bit signed values
                 samples[channel][0] += left;
                 samples[channel][1] += right;
-                _mix_rconv->put_sample((idx << 1), left * _channels_pan[(idx * 6) + channel].first);
-                _mix_rconv->put_sample((idx << 1) | 1, right * _channels_pan[(idx * 6) + channel].second);
+                _mix_rconv->put_sample((idx << 1), left * _channels_pan[(idx * 6) + channel].left);
+                _mix_rconv->put_sample((idx << 1) | 1, right * _channels_pan[(idx * 6) + channel].right);
             } else {
                 _mix_rconv->put_sample((idx << 1), 0);
                 _mix_rconv->put_sample((idx << 1) | 1, 0);
@@ -86,13 +86,13 @@ void opn2_wrapper::clock() {
 
     /* calculate mixed output */
     _mix_rconv->advance_timer();
-    _mix_output.first = _mix_rconv->get_sample(0);
-    _mix_output.second = _mix_rconv->get_sample(1);
+    _mix_output.left = _mix_rconv->get_sample(0);
+    _mix_output.right = _mix_rconv->get_sample(1);
     if(_dual_chip) {
-        _mix_output.first = (_mix_output.first + _mix_rconv->get_sample(2)) / 2;
-        _mix_output.second = (_mix_output.second + _mix_rconv->get_sample(3)) / 2;
+        _mix_output.left = (_mix_output.left + _mix_rconv->get_sample(2)) / 2;
+        _mix_output.right = (_mix_output.right + _mix_rconv->get_sample(3)) / 2;
     }
-    _mix_output.first *= OPN2_MIX_AMP; _mix_output.second *= OPN2_MIX_AMP;
+    _mix_output.left *= OPN2_MIX_AMP; _mix_output.right *= OPN2_MIX_AMP;
 }
 
 void opn2_wrapper::write(uintptr_t chip, uintptr_t port, uintptr_t addr_reg, uintptr_t val) {

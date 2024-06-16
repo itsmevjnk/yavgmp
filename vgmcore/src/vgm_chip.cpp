@@ -11,7 +11,7 @@ vgm_chip::vgm_chip(size_t num_channels, bool stereo_channels) : channels(num_cha
     channels_pan = _channels_pan = new stereo_volume_t[num_channels];
     for(size_t i = 0; i < num_channels; i++) {
         _channels_out_left[i] = _channels_out_right[i] = 0;
-        _channels_pan[i] = std::make_pair(1, 1);
+        _channels_pan[i] = {1, 1};
     }
 }
 
@@ -27,11 +27,11 @@ vgm_chip::~vgm_chip() {
 stereo_sample_t vgm_chip::mix_channels() {
     sample_t left = 0, right = 0;
     for(size_t i = 0; i < channels; i++) {
-        left += _channels_out_left[i] * _channels_pan[i].first;
-        right += _channels_out_right[i] * _channels_pan[i].second;
+        left += _channels_out_left[i] * _channels_pan[i].left;
+        right += _channels_out_right[i] * _channels_pan[i].right;
     }
     // return std::make_pair(left / channels, right / channels);
-    return std::make_pair(left, right); // do not pre-attenuate, otherwise we'll end up with very quiet output
+    return {left, right}; // do not pre-attenuate, otherwise we'll end up with very quiet output
 }
 
 /* many chips won't have this method implemented, so it's safer to provide a generic implementation that throws an error */

@@ -59,8 +59,8 @@ void emu2149_wrapper::write(uintptr_t chip, uintptr_t port, uintptr_t addr_reg, 
         /* write stereo mask */
         int base = chip * 3;
         for(int i = 0; i < 3; i++) {
-            _channels_pan[base + i].first = (val & (1 << (i << 1))) ? 1.0 : 0.0; // left
-            _channels_pan[base + i].second = (val & (1 << ((i << 1) + 1))) ? 1.0 : 0.0; // right
+            _channels_pan[base + i].left = (val & (1 << (i << 1))) ? 1.0 : 0.0; // left
+            _channels_pan[base + i].right = (val & (1 << ((i << 1) + 1))) ? 1.0 : 0.0; // right
         }
     } else {
         /* normal I/O write */

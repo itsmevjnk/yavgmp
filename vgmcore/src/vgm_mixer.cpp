@@ -11,7 +11,7 @@ const volume_t vgm_parser::chip_volumes[] = {
 };
 
 stereo_sample_t vgm_parser::mix_outputs() {
-    stereo_sample_t result = std::make_pair(0.0, 0.0);
+    stereo_sample_t result = {0, 0};
     volume_t absvol = 0; // absolute volume
     for(int i = 0; i < sizeof(chips) / sizeof(vgm_chip*); i++) {
         vgm_chip* chip = chips_array[i];
@@ -19,14 +19,14 @@ stereo_sample_t vgm_parser::mix_outputs() {
             /* chip is available */
             stereo_sample_t output = chip->mix_channels();
             volume_t volume = chip_volumes[i]; absvol += volume;
-            result.first += output.first * volume;
-            result.second += output.second * volume;
+            result.left += output.left * volume;
+            result.right += output.right * volume;
         }
     }
     if(absvol != 0) {
         /* normalise sample values */
-        result.first /= absvol;
-        result.second /= absvol;
+        result.left /= absvol;
+        result.right /= absvol;
     }
     return result;
 }

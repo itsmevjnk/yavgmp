@@ -84,7 +84,7 @@ void psg_emu::reset() {
 
     for(size_t i = 0; i < 4; i++) {
         _channels_out[i] = 0;
-        _channels_pan[i] = std::make_pair(1, 1);
+        _channels_pan[i] = {1, 1};
     }
 }
 
@@ -190,8 +190,8 @@ void psg_emu::calc() {
 void psg_emu::write_stereo(uint8_t val) {
     if(_no_gg_stereo) return; // ignore
     for(size_t ch = 0; ch < 4; ch++) {
-        _channels_pan[ch].first = (val & (1 << (4 + ch))) ? 1.0 : 0.0;
-        _channels_pan[ch].second = (val & (1 << ch)) ? 1.0 : 0.0;
+        _channels_pan[ch].left = (val & (1 << (4 + ch))) ? 1.0 : 0.0;
+        _channels_pan[ch].right = (val & (1 << ch)) ? 1.0 : 0.0;
     }
 }
 
