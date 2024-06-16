@@ -89,6 +89,12 @@ void vgm_parser::init(const char* path, bool decompress_all) {
     if(!_stream) _stream = new zstr::ifstream(path);
     
     init_stub(decompress_all);
+
+    if(decompress_all) {
+        /* we've done reading the file, so let's close it */
+        delete _stream;
+        _stream = nullptr;
+    }
 }
 
 vgm_parser::vgm_parser(std::istream& stream, bool read_all) {
